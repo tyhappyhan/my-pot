@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://tyhappyhan.github.io/my-pot/sitemap.xml
