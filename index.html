@@ -94,7 +94,14 @@
 
     // HTML, CSS, JS 차트에 대한 데이터와 색상
     drawChart('htmlChart', [70, 20, 10], ['#FF6384', '#36A2EB', '#FFCE56'], '80%'); // HTML 차트
-    
+    <form id="portfolio-form">
+  <label for="stock-name">주식 이름:</label>
+  <input type="text" id="stock-name" required>
+  <label for="stock-percent">주식 비율:</label>
+  <input type="number" id="stock-percent" required>
+  <button type="submit">저장</button>
+</form>
+
   </script>
   <script type="module">
   // Import the functions you need from the SDKs you need
