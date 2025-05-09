@@ -5,18 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>My Pot</title>
   <meta name="description" content="My Pot는 내가 만든 첫 번째 웹사이트입니다." />
-
-  <!-- Chart.js CDN (UMD 방식) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
 
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 2rem;
-      text-align: center;
+    }
+    h1 {
+      font-size: 1.5rem;
+      color: black;
+      font-weight: bold;
+      margin-bottom: 10px;
     }
     form {
       margin-top: 20px;
+      text-align: center;
     }
     input, button {
       margin: 5px;
@@ -25,13 +29,33 @@
     canvas {
       max-width: 400px;
       margin: auto;
+      display: block;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      text-align: center;
+    }
+    li {
+      margin: 5px 0;
+    }
+    .delete-button {
+      margin-left: 10px;
+      background-color: crimson;
+      color: white;
+      border: none;
+      padding: 2px 6px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
 
-  <h2>주식 포트폴리오 차트</h2>
+  <h1>Stock Portfolio</h1>
+
   <canvas id="portfolioChart" width="300" height="300"></canvas>
+
+  <ul id="portfolioList"></ul>
 
   <form id="portfolioForm">
     <label for="stock-name">주식 이름:</label>
@@ -41,12 +65,14 @@
     <button type="submit">저장</button>
   </form>
 
-  <button id="resetButton">초기화</button>
+  <div style="text-align: center; margin-top: 10px;">
+    <button id="resetButton">초기화</button>
+  </div>
 
   <!-- Firebase SDK -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-    import { getDatabase, ref, push, onValue, get, remove } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+    import { getDatabase, ref, push, onValue, get, remove, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAdVxtJBPhfjJFCExi1epjQQGpt3FPMTrQ",
@@ -75,12 +101,36 @@
         portfolioMap[name] = (portfolioMap[name] || 0) + percent;
       }
 
-      const total = Object.values(portfolioMap).reduce((a, b) => a + b, 0);
-      const labels = Object.keys(portfolioMap);
-      const values = Object.values(portfolioMap).map(val => ((val / total) * 100).toFixed(2));
-
       const ctx = document.getElementById('portfolioChart').getContext('2d');
       if (chartInstance) chartInstance.destroy();
+
+      const labels = Object.keys(portfolioMap);
+      const values = Object.values(portfolioMap);
+
+      if (labels.length === 0) {
+        chartInstance = new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: ['데이터 없음'],
+            datasets: [{
+              data: [1],
+              backgroundColor: ['#e0e0e0']
+            }]
+          },
+          options: {
+            plugins: {
+              legend: { display: false },
+              tooltip: { enabled: false }
+            },
+            cutout: '80%',
+            responsive: true
+          }
+        });
+        return;
+      }
+
+      const total = values.reduce((a, b) => a + b, 0);
+      const percentageValues = values.map(val => ((val / total) * 100).toFixed(2));
 
       chartInstance = new Chart(ctx, {
         type: 'doughnut',
@@ -88,7 +138,7 @@
           labels: labels,
           datasets: [{
             label: '포트폴리오',
-            data: values,
+            data: percentageValues,
             backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#00D084'],
           }]
         },
@@ -109,12 +159,29 @@
       });
     }
 
+    function updateList(data) {
+      const list = document.getElementById('portfolioList');
+      list.innerHTML = '';
+      for (const key in data) {
+        const li = document.createElement('li');
+        li.textContent = `${data[key].stockName} - ${data[key].stockPercent}%`;
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '삭제';
+        deleteBtn.className = 'delete-button';
+        deleteBtn.onclick = () => remove(child(portfolioRef, key)); // confirm 없이 삭제
+        li.appendChild(deleteBtn);
+
+        list.appendChild(li);
+      }
+    }
+
     onValue(portfolioRef, (snapshot) => {
       const data = snapshot.val() || {};
       drawChart(data);
+      updateList(data);
     });
 
-    // 폼 제출
     const form = document.getElementById('portfolioForm');
     const nameInput = document.getElementById('stock-name');
     const percentInput = document.getElementById('stock-percent');
@@ -153,12 +220,10 @@
       percentInput.value = '';
     });
 
-    // 초기화 버튼
     document.getElementById('resetButton').addEventListener('click', async () => {
-      if (confirm("정말 모든 데이터를 초기화하시겠습니까?")) {
-        await remove(portfolioRef);
-      }
+      await remove(portfolioRef);
     });
   </script>
 </body>
 </html>
+
