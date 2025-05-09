@@ -173,6 +173,41 @@ form.addEventListener("submit", (event) => {
   stockPercentInput.value = "";
 });
 </script>
+<script>
+// Firebase에서 실시간 데이터 읽기
+portfolioRef.on("value", (snapshot) => {
+  const portfolios = snapshot.val();  // Firebase에서 읽은 데이터
+  const labels = [];
+  const data = [];
+
+  // 데이터를 labels (주식 이름)과 data (주식 비율)로 분리
+  for (const id in portfolios) {
+    labels.push(portfolios[id].stockName);  // 주식 이름
+    data.push(portfolios[id].stockPercent); // 주식 비율
+  }
+
+  // 차트 업데이트 함수 호출
+  updateChart(labels, data);
+});
+
+// 차트 업데이트 함수
+function updateChart(labels, data) {
+  const ctx = document.getElementById("portfolioChart").getContext("2d");
+  new Chart(ctx, {
+    type: "doughnut",  // 차트 타입
+    data: {
+      labels: labels,  // 주식 이름
+      datasets: [{
+        data: data,     // 주식 비율
+        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
+      }]
+    },
+    options: {
+      responsive: true,
+    }
+  });
+}
+</script>
 
 </body>
 </html>
