@@ -96,5 +96,29 @@
     drawChart('htmlChart', [70, 20, 10], ['#FF6384', '#36A2EB', '#FFCE56'], '80%'); // HTML 차트
     
   </script>
+  <script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-analytics.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+    apiKey: "AIzaSyAdVxtJBPhfjJFCExi1epjQQGpt3FPMTrQ",
+    authDomain: "stock-pot-62bae.firebaseapp.com",
+    databaseURL: "https://stock-pot-62bae-default-rtdb.firebaseio.com",
+    projectId: "stock-pot-62bae",
+    storageBucket: "stock-pot-62bae.firebasestorage.app",
+    messagingSenderId: "891999801181",
+    appId: "1:891999801181:web:06f0df3269271fb146e2b4",
+    measurementId: "G-7TQMFR10PQ"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+</script>
 </body>
 </html>
