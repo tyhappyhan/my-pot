@@ -45,6 +45,27 @@
     .button-container button {
       margin-left: 10px;
     }
+    .stock-list {
+      margin-top: 2rem;
+      list-style-type: none;
+      padding: 0;
+    }
+    .stock-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .delete-btn {
+      background-color: #FF6347;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+    .delete-btn:hover {
+      background-color: #FF4500;
+    }
   </style>
 </head>
 <body>
@@ -65,9 +86,11 @@
     <button id="resetButton">초기화</button>
   </div>
 
+  <ul class="stock-list" id="stockList"></ul>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-    import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+    import { getDatabase, ref, push, onValue, remove, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAdVxtJBPhfjJFCExi1epjQQGpt3FPMTrQ",
@@ -103,7 +126,7 @@
         },
         options: {
           responsive: true,
-          maintainAspectRatio: false, // 크기를 고정하려면 이 속성을 추가합니다.
+          maintainAspectRatio: false,
           cutout: '80%',
           plugins: {
             legend: { display: true },
@@ -145,7 +168,37 @@
         }
 
         drawChart(labels, values);
+        updateStockList(data);
       });
+    }
+
+    function updateStockList(data) {
+      const stockList = document.getElementById('stockList');
+      stockList.innerHTML = '';
+
+      if (data) {
+        for (const key in data) {
+          const item = data[key];
+          const li = document.createElement('li');
+          li.classList.add('stock-item');
+          li.innerHTML = `
+            <span>${item.stockName}: ${item.stockPercent}%</span>
+            <button class="delete-btn" onclick="deleteStock('${key}')">삭제</button>
+          `;
+          stockList.appendChild(li);
+        }
+      }
+    }
+
+    function deleteStock(stockKey) {
+      const stockRef = ref(db, 'portfolio/' + stockKey);
+      remove(stockRef)
+        .then(() => {
+          updatePortfolio();
+        })
+        .catch((error) => {
+          alert('삭제 실패: ' + error.message);
+        });
     }
 
     // 초기화 버튼 클릭 시
