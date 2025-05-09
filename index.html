@@ -90,7 +90,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-    import { getDatabase, ref, push, onValue, remove, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+    import { getDatabase, ref, push, onValue, remove } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAdVxtJBPhfjJFCExi1epjQQGpt3FPMTrQ",
@@ -162,6 +162,7 @@
         const labels = Object.keys(portfolioMap);
         const values = Object.values(portfolioMap);
 
+        // 현금 추가: 비율이 100% 이하일 때만 현금을 추가
         if (total < 100) {
           labels.push('현금');
           values.push(100 - total);
