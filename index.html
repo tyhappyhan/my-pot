@@ -17,9 +17,10 @@
 </head>
 <body>
   
-
+  <!-- 주식 포트폴리오 차트를 위한 캔버스 추가 -->
+  <h2>주식 포트폴리오 차트</h2>
+  <canvas id="portfolioChart" width="300" height="300"></canvas>
   
-
   <script type="module">
     // Firebase 초기화
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
@@ -76,13 +77,15 @@
       const labels = [];
       const data = [];
 
-      for (const id in portfolios) {
-        labels.push(portfolios[id].stockName);
-        data.push(portfolios[id].stockPercent);
-      }
+      if (portfolios) {
+        for (const id in portfolios) {
+          labels.push(portfolios[id].stockName);
+          data.push(Number(portfolios[id].stockPercent)); // 숫자로 변환
+        }
 
-      // 차트 업데이트
-      drawChart('portfolioChart', labels, data, ['#FF6384', '#36A2EB', '#FFCE56'], '80%');
+        // 차트 업데이트
+        drawChart('portfolioChart', labels, data, ['#FF6384', '#36A2EB', '#FFCE56'], '80%');
+      }
     });
 
     // 폼 제출 이벤트 처리
@@ -119,3 +122,5 @@
 
 </body>
 </html>
+
+
