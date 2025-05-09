@@ -1,28 +1,19 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="google-site-verification" content="8V2Ne545QcWLGuL19gf_JvAI_4vuMgkI9X6YykyyGeI" />
-
   <title>My Pot</title>
-  <meta name="description" content="My Pot는 내가 만든 첫 번째 웹사이트입니다.">
-  
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
-
+  <meta name="description" content="My Pot는 내가 만든 첫 번째 웹사이트입니다." />
 </head>
 <body>
-  
-  <!-- 주식 포트폴리오 차트를 위한 캔버스 추가 -->
+
   <h2>주식 포트폴리오 차트</h2>
   <canvas id="portfolioChart" width="300" height="300"></canvas>
-  
+
   <script type="module">
-    // Firebase 초기화
+    import { Chart } from "https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.esm.js";
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
     import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
@@ -31,7 +22,7 @@
       authDomain: "stock-pot-62bae.firebaseapp.com",
       databaseURL: "https://stock-pot-62bae-default-rtdb.firebaseio.com",
       projectId: "stock-pot-62bae",
-      storageBucket: "stock-pot-62bae.firebasestorage.app",
+      storageBucket: "stock-pot-62bae.appspot.com",
       messagingSenderId: "891999801181",
       appId: "1:891999801181:web:06f0df3269271fb146e2b4",
       measurementId: "G-7TQMFR10PQ"
@@ -41,7 +32,6 @@
     const db = getDatabase(app);
     const portfolioRef = ref(db, 'portfolio');
 
-    // 차트 그리기 함수
     function drawChart(id, labels, data, colors, cutout) {
       const ctx = document.getElementById(id).getContext('2d');
       new Chart(ctx, {
@@ -59,7 +49,7 @@
           cutout: cutout,
           plugins: {
             legend: { display: false },
-            tooltip: { 
+            tooltip: {
               callbacks: {
                 label: function(context) {
                   return `${context.label}: ${context.raw}%`;
@@ -71,7 +61,6 @@
       });
     }
 
-    // Firebase에서 데이터 읽어오기
     onValue(portfolioRef, (snapshot) => {
       const portfolios = snapshot.val();
       const labels = [];
@@ -80,21 +69,19 @@
       if (portfolios) {
         for (const id in portfolios) {
           labels.push(portfolios[id].stockName);
-          data.push(Number(portfolios[id].stockPercent)); // 숫자로 변환
+          data.push(Number(portfolios[id].stockPercent));
         }
 
-        // 차트 업데이트
-        drawChart('portfolioChart', labels, data, ['#FF6384', '#36A2EB', '#FFCE56'], '80%');
+        drawChart('portfolioChart', labels, data, ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0'], '80%');
       }
     });
 
-    // 폼 제출 이벤트 처리
     const form = document.createElement('form');
     form.innerHTML = `
       <label for="stock-name">주식 이름:</label>
-      <input type="text" id="stock-name" required>
+      <input type="text" id="stock-name" required />
       <label for="stock-percent">주식 비율:</label>
-      <input type="number" id="stock-percent" required>
+      <input type="number" id="stock-percent" required min="0" max="100" />
       <button type="submit">저장</button>
     `;
     document.body.appendChild(form);
@@ -105,16 +92,19 @@
     form.addEventListener("submit", (event) => {
       event.preventDefault();
 
-      const stockName = stockNameInput.value;
-      const stockPercent = stockPercentInput.value;
+      const stockName = stockNameInput.value.trim();
+      const stockPercent = parseFloat(stockPercentInput.value);
 
-      // Firebase에 데이터 저장
+      if (!stockName || isNaN(stockPercent) || stockPercent < 0 || stockPercent > 100) {
+        alert("올바른 이름과 0~100 사이의 비율을 입력하세요.");
+        return;
+      }
+
       push(portfolioRef, {
         stockName: stockName,
         stockPercent: stockPercent
       });
 
-      // 폼 입력 초기화
       stockNameInput.value = "";
       stockPercentInput.value = "";
     });
@@ -122,5 +112,3 @@
 
 </body>
 </html>
-
-
