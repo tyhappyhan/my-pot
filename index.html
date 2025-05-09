@@ -3,17 +3,46 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="google-site-verification" content="8V2Ne545QcWLGuL19gf_JvAI_4vuMgkI9X6YykyyGeI" />
   <title>My Pot</title>
   <meta name="description" content="My Pot는 내가 만든 첫 번째 웹사이트입니다." />
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      text-align: center;
+    }
+    form {
+      margin-top: 20px;
+    }
+    input, button {
+      margin: 5px;
+      padding: 5px;
+    }
+    canvas {
+      max-width: 400px;
+      margin: auto;
+    }
+  </style>
 </head>
 <body>
 
   <h2>주식 포트폴리오 차트</h2>
   <canvas id="portfolioChart" width="300" height="300"></canvas>
 
+  <form id="portfolioForm">
+    <label for="stock-name">주식 이름:</label>
+    <input type="text" id="stock-name" required />
+    <label for="stock-percent">비율(%):</label>
+    <input type="number" id="stock-percent" required min="0" max="100" />
+    <button type="submit">저장</button>
+  </form>
+
+  <!-- Firebase SDK -->
   <script type="module">
-    import { Chart } from "https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.esm.js";
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
     import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
@@ -32,23 +61,28 @@
     const db = getDatabase(app);
     const portfolioRef = ref(db, 'portfolio');
 
-    function drawChart(id, labels, data, colors, cutout) {
-      const ctx = document.getElementById(id).getContext('2d');
-      new Chart(ctx, {
+    let chartInstance;
+
+    function drawChart(labels, data) {
+      const ctx = document.getElementById('portfolioChart').getContext('2d');
+
+      if (chartInstance) chartInstance.destroy();
+
+      chartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
           labels: labels,
           datasets: [{
-            label: '주식 포트폴리오',
+            label: '포트폴리오',
             data: data,
-            backgroundColor: colors,
+            backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#00D084'],
           }]
         },
         options: {
           responsive: true,
-          cutout: cutout,
+          cutout: '80%',
           plugins: {
-            legend: { display: false },
+            legend: { display: true },
             tooltip: {
               callbacks: {
                 label: function(context) {
@@ -61,54 +95,45 @@
       });
     }
 
+    // 실시간 데이터 리스닝
     onValue(portfolioRef, (snapshot) => {
-      const portfolios = snapshot.val();
+      const data = snapshot.val();
       const labels = [];
-      const data = [];
+      const values = [];
 
-      if (portfolios) {
-        for (const id in portfolios) {
-          labels.push(portfolios[id].stockName);
-          data.push(Number(portfolios[id].stockPercent));
+      if (data) {
+        for (const key in data) {
+          labels.push(data[key].stockName);
+          values.push(Number(data[key].stockPercent));
         }
-
-        drawChart('portfolioChart', labels, data, ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0'], '80%');
       }
+
+      drawChart(labels, values);
     });
 
-    const form = document.createElement('form');
-    form.innerHTML = `
-      <label for="stock-name">주식 이름:</label>
-      <input type="text" id="stock-name" required />
-      <label for="stock-percent">주식 비율:</label>
-      <input type="number" id="stock-percent" required min="0" max="100" />
-      <button type="submit">저장</button>
-    `;
-    document.body.appendChild(form);
+    // 폼 제출 핸들링
+    const form = document.getElementById('portfolioForm');
+    const nameInput = document.getElementById('stock-name');
+    const percentInput = document.getElementById('stock-percent');
 
-    const stockNameInput = document.getElementById("stock-name");
-    const stockPercentInput = document.getElementById("stock-percent");
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = nameInput.value.trim();
+      const percent = parseFloat(percentInput.value);
 
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-
-      const stockName = stockNameInput.value.trim();
-      const stockPercent = parseFloat(stockPercentInput.value);
-
-      if (!stockName || isNaN(stockPercent) || stockPercent < 0 || stockPercent > 100) {
+      if (!name || isNaN(percent) || percent < 0 || percent > 100) {
         alert("올바른 이름과 0~100 사이의 비율을 입력하세요.");
         return;
       }
 
       push(portfolioRef, {
-        stockName: stockName,
-        stockPercent: stockPercent
+        stockName: name,
+        stockPercent: percent
       });
 
-      stockNameInput.value = "";
-      stockPercentInput.value = "";
+      nameInput.value = '';
+      percentInput.value = '';
     });
   </script>
-
 </body>
 </html>
