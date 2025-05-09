@@ -4,23 +4,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>My Pot</title>
-  <meta name="description" content="My Pot는 내가 만든 첫 번째 웹사이트입니다." />
-
-  <!-- Chart.js CDN (UMD 방식) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
-
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 2rem;
       text-align: center;
+      padding: 20px;
     }
-    form {
-      margin-top: 20px;
+    form, .portfolio-item {
+      margin: 10px 0;
     }
     input, button {
+      padding: 5px 10px;
       margin: 5px;
-      padding: 5px;
     }
     canvas {
       max-width: 400px;
@@ -34,19 +30,18 @@
   <canvas id="portfolioChart" width="300" height="300"></canvas>
 
   <form id="portfolioForm">
-    <label for="stock-name">주식 이름:</label>
-    <input type="text" id="stock-name" required />
-    <label for="stock-percent">비율(%):</label>
-    <input type="number" id="stock-percent" required min="0" max="100" />
+    <input type="text" id="stock-name" placeholder="주식 이름" required />
+    <input type="number" id="stock-percent" placeholder="비율(%)" required min="0" max="100" />
     <button type="submit">저장</button>
   </form>
 
   <button id="resetButton">초기화</button>
 
-  <!-- Firebase SDK -->
+  <div id="portfolioList"></div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-    import { getDatabase, ref, push, onValue, get, remove } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+    import { getDatabase, ref, push, onValue, remove, get } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAdVxtJBPhfjJFCExi1epjQQGpt3FPMTrQ",
@@ -63,38 +58,28 @@
     const db = getDatabase(app);
     const portfolioRef = ref(db, 'portfolio');
 
-    let chartInstance;
+    let chart;
 
-    function drawChart(rawData) {
-      const portfolioMap = {};
-
-      for (const key in rawData) {
-        const item = rawData[key];
-        const name = item.stockName;
-        const percent = Number(item.stockPercent);
-        portfolioMap[name] = (portfolioMap[name] || 0) + percent;
-      }
-
-      const total = Object.values(portfolioMap).reduce((a, b) => a + b, 0);
-      const labels = Object.keys(portfolioMap);
-      const values = Object.values(portfolioMap).map(val => ((val / total) * 100).toFixed(2));
-
+    function drawChart(dataMap) {
       const ctx = document.getElementById('portfolioChart').getContext('2d');
-      if (chartInstance) chartInstance.destroy();
+      if (chart) chart.destroy();
 
-      chartInstance = new Chart(ctx, {
+      const labels = Object.keys(dataMap);
+      const data = Object.values(dataMap);
+
+      chart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: labels,
+          labels,
           datasets: [{
             label: '포트폴리오',
-            data: values,
-            backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#00D084'],
+            data,
+            backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#00D084', '#FF9F40', '#C9CBCF'],
           }]
         },
         options: {
           responsive: true,
-          cutout: '80%',
+          cutout: '70%',
           plugins: {
             legend: { display: true },
             tooltip: {
@@ -109,34 +94,54 @@
       });
     }
 
-    onValue(portfolioRef, (snapshot) => {
-      const data = snapshot.val() || {};
-      drawChart(data);
+    function updateUI(snapshot) {
+      const raw = snapshot.val() || {};
+      const dataMap = {};
+      const list = document.getElementById('portfolioList');
+      list.innerHTML = '';
+
+      for (const key in raw) {
+        const { stockName, stockPercent } = raw[key];
+        dataMap[stockName] = (dataMap[stockName] || 0) + Number(stockPercent);
+
+        const item = document.createElement('div');
+        item.className = 'portfolio-item';
+        item.innerHTML = `
+          ${stockName}: ${stockPercent}% 
+          <button onclick="deleteItem('${key}')">삭제</button>
+        `;
+        list.appendChild(item);
+      }
+
+      drawChart(dataMap);
+    }
+
+    window.deleteItem = function(id) {
+      const itemRef = ref(db, `portfolio/${id}`);
+      remove(itemRef).catch(err => alert('삭제 실패: ' + err.message));
+    };
+
+    document.getElementById('resetButton').addEventListener('click', () => {
+      if (confirm("모든 항목을 삭제할까요?")) {
+        remove(portfolioRef).catch(err => alert('초기화 실패: ' + err.message));
+      }
     });
 
-    // 폼 제출
-    const form = document.getElementById('portfolioForm');
-    const nameInput = document.getElementById('stock-name');
-    const percentInput = document.getElementById('stock-percent');
-
-    form.addEventListener('submit', async (e) => {
+    document.getElementById('portfolioForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = nameInput.value.trim();
-      const percent = parseFloat(percentInput.value);
+      const name = document.getElementById('stock-name').value.trim();
+      const percent = parseFloat(document.getElementById('stock-percent').value);
 
       if (!name || isNaN(percent) || percent <= 0 || percent > 100) {
-        alert("올바른 이름과 0~100 사이의 비율을 입력하세요.");
+        alert("이름과 0~100 사이의 비율을 입력하세요.");
         return;
       }
 
       const snapshot = await get(portfolioRef);
-      const data = snapshot.val();
+      const data = snapshot.val() || {};
       let total = 0;
-
-      if (data) {
-        for (const key in data) {
-          total += Number(data[key].stockPercent);
-        }
+      for (const key in data) {
+        total += Number(data[key].stockPercent);
       }
 
       if (total + percent > 100) {
@@ -144,23 +149,15 @@
         return;
       }
 
-      await push(portfolioRef, {
-        stockName: name,
-        stockPercent: percent
-      });
-
-      nameInput.value = '';
-      percentInput.value = '';
+      push(portfolioRef, { stockName: name, stockPercent: percent });
+      document.getElementById('stock-name').value = '';
+      document.getElementById('stock-percent').value = '';
     });
 
-    // 초기화 버튼
-    document.getElementById('resetButton').addEventListener('click', async () => {
-      if (confirm("정말 모든 데이터를 초기화하시겠습니까?")) {
-        await remove(portfolioRef);
-      }
-    });
+    onValue(portfolioRef, updateUI);
   </script>
 </body>
 </html>
 
-   
+
+    
