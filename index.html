@@ -5,26 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>My Pot</title>
   <meta name="description" content="My Pot는 내가 만든 첫 번째 웹사이트입니다." />
-
-  <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
-
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 2rem;
+      padding: 20px;
       text-align: center;
     }
     form {
       margin-top: 20px;
     }
     input, button {
+      padding: 8px;
       margin: 5px;
-      padding: 5px;
     }
-    canvas {
-      max-width: 400px;
-      margin: auto;
+    .portfolio-item {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 10px;
+    }
+    .portfolio-item button {
+      margin-left: 10px;
     }
   </style>
 </head>
@@ -34,17 +36,19 @@
   <canvas id="portfolioChart" width="300" height="300"></canvas>
 
   <form id="portfolioForm">
-    <label for="stock-name">주식 이름:</label>
-    <input type="text" id="stock-name" required />
-    <label for="stock-percent">비율(%):</label>
-    <input type="number" id="stock-percent" required min="0" max="100" />
+    <input type="text" id="stock-name" placeholder="주식 이름" required />
+    <input type="number" id="stock-percent" placeholder="비율(%)" required min="0" max="100" />
     <button type="submit">저장</button>
   </form>
 
-  <!-- Firebase SDK -->
+  <button id="resetButton">초기화</button>
+
+  <div id="portfolioList"></div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-    import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+    import { getDatabase, ref, push, onValue, get, remove } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+    import { Chart } from "https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.esm.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAdVxtJBPhfjJFCExi1epjQQGpt3FPMTrQ",
@@ -95,34 +99,92 @@
       });
     }
 
-    // 실시간 데이터 리스닝
-    onValue(portfolioRef, (snapshot) => {
-      const data = snapshot.val();
-      const labels = [];
-      const values = [];
+    function updatePortfolioList() {
+      const portfolioList = document.getElementById('portfolioList');
+      portfolioList.innerHTML = '';  // 기존 목록 초기화
 
-      if (data) {
-        for (const key in data) {
-          labels.push(data[key].stockName);
-          values.push(Number(data[key].stockPercent));
+      onValue(portfolioRef, (snapshot) => {
+        const data = snapshot.val();
+        const portfolioMap = {};
+
+        if (data) {
+          for (const key in data) {
+            const item = data[key];
+            const name = item.stockName;
+            const percent = Number(item.stockPercent);
+
+            if (portfolioMap[name]) {
+              portfolioMap[name] += percent;
+            } else {
+              portfolioMap[name] = percent;
+            }
+          }
         }
-      }
 
-      drawChart(labels, values);
-    });
+        const labels = Object.keys(portfolioMap);
+        const values = Object.values(portfolioMap);
 
-    // 폼 제출 핸들링
+        drawChart(labels, values);
+
+        // 포트폴리오 항목을 목록에 추가
+        for (const key in data) {
+          const item = data[key];
+          const div = document.createElement('div');
+          div.classList.add('portfolio-item');
+          div.innerHTML = `
+            ${item.stockName}: ${item.stockPercent}%
+            <button onclick="deleteItem('${key}')">삭제</button>
+          `;
+          portfolioList.appendChild(div);
+        }
+      });
+    }
+
+    function deleteItem(id) {
+      const itemRef = ref(db, 'portfolio/' + id);
+      remove(itemRef).then(() => {
+        updatePortfolioList();
+      }).catch((error) => {
+        alert("삭제 실패: " + error.message);
+      });
+    }
+
+    function resetPortfolio() {
+      const portfolioRef = ref(db, 'portfolio');
+      remove(portfolioRef).then(() => {
+        updatePortfolioList();
+      }).catch((error) => {
+        alert("초기화 실패: " + error.message);
+      });
+    }
+
+    // 폼 제출 시 처리
     const form = document.getElementById('portfolioForm');
     const nameInput = document.getElementById('stock-name');
     const percentInput = document.getElementById('stock-percent');
 
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const name = nameInput.value.trim();
       const percent = parseFloat(percentInput.value);
 
-      if (!name || isNaN(percent) || percent < 0 || percent > 100) {
+      if (!name || isNaN(percent) || percent <= 0 || percent > 100) {
         alert("올바른 이름과 0~100 사이의 비율을 입력하세요.");
+        return;
+      }
+
+      const snapshot = await get(portfolioRef);
+      const data = snapshot.val();
+      let currentTotal = 0;
+
+      if (data) {
+        for (const key in data) {
+          currentTotal += Number(data[key].stockPercent);
+        }
+      }
+
+      if (currentTotal + percent > 100) {
+        alert(`총 비율이 100%를 넘을 수 없습니다. 현재: ${currentTotal}%, 추가 시: ${currentTotal + percent}%`);
         return;
       }
 
@@ -133,7 +195,15 @@
 
       nameInput.value = '';
       percentInput.value = '';
+      updatePortfolioList();
     });
+
+    // 초기화 버튼 클릭 시 처리
+    document.getElementById('resetButton').addEventListener('click', resetPortfolio);
+
+    // 페이지 로드 시 포트폴리오 목록 및 차트 업데이트
+    updatePortfolioList();
   </script>
+
 </body>
 </html>
