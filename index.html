@@ -127,5 +127,29 @@
   const app = initializeApp(firebaseConfig);
   const analytics = getAnalytics(app);
 </script>
+  <script>
+// 폼 제출 이벤트 처리
+const form = document.getElementById("portfolio-form");
+const stockNameInput = document.getElementById("stock-name");
+const stockPercentInput = document.getElementById("stock-percent");
+
+form.addEventListener("submit", (event) => {
+  event.preventDefault();  // 페이지 새로고침 방지
+
+  const stockName = stockNameInput.value;
+  const stockPercent = stockPercentInput.value;
+
+  // Firebase에 데이터 저장
+  portfolioRef.push({
+    stockName: stockName,
+    stockPercent: stockPercent
+  });
+
+  // 폼 입력 초기화
+  stockNameInput.value = "";
+  stockPercentInput.value = "";
+});
+</script>
+
 </body>
 </html>
