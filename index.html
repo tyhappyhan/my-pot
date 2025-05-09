@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  
   <meta name="google-site-verification" content="8V2Ne545QcWLGuL19gf_JvAI_4vuMgkI9X6YykyyGeI" />
 
   <title>My Pot</title>
@@ -52,8 +51,8 @@
     <h2> 도넛 차트 </h2>
     <div class="charts">
       <!-- 차트 크기를 줄이기 위해 width와 height 값을 수정 -->
-      <canvas id="htmlChart" width="70" height="70"></canvas>
-      
+      <canvas id="htmlChart" width="200" height="200"></canvas>
+      <canvas id="portfolioChart" width="200" height="200"></canvas>
     </div>
   </section>
 
@@ -61,25 +60,44 @@
     <p>&copy; 2025 한태영 모든 권리 소유.</p>
   </footer>
 
-  <script>
-    // 각 차트 그리기
-    function drawChart(id, data, colors, cutout) {
+  <script type="module">
+    // Firebase 초기화
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+    import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAdVxtJBPhfjJFCExi1epjQQGpt3FPMTrQ",
+      authDomain: "stock-pot-62bae.firebaseapp.com",
+      databaseURL: "https://stock-pot-62bae-default-rtdb.firebaseio.com",
+      projectId: "stock-pot-62bae",
+      storageBucket: "stock-pot-62bae.firebasestorage.app",
+      messagingSenderId: "891999801181",
+      appId: "1:891999801181:web:06f0df3269271fb146e2b4",
+      measurementId: "G-7TQMFR10PQ"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const portfolioRef = ref(db, 'portfolio');
+
+    // 차트 그리기 함수
+    function drawChart(id, labels, data, colors, cutout) {
       const ctx = document.getElementById(id).getContext('2d');
       new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: ['내 주식', '내 주식', '내 주식 '],
+          labels: labels,
           datasets: [{
-            label: '기술 스택',
+            label: '주식 포트폴리오',
             data: data,
             backgroundColor: colors,
           }]
         },
         options: {
           responsive: true,
-          cutout: cutout,  // 중앙 비율 조정 (차트의 크기 조정)
+          cutout: cutout,
           plugins: {
-            legend: { display: false },  // 범례 숨기기
+            legend: { display: false },
             tooltip: { 
               callbacks: {
                 label: function(context) {
@@ -92,122 +110,52 @@
       });
     }
 
-    // HTML, CSS, JS 차트에 대한 데이터와 색상
-    drawChart('htmlChart', [70, 20, 10], ['#FF6384', '#36A2EB', '#FFCE56'], '80%'); // HTML 차트
-    <form id="portfolio-form">
-  <label for="stock-name">주식 이름:</label>
-  <input type="text" id="stock-name" required>
-  <label for="stock-percent">주식 비율:</label>
-  <input type="number" id="stock-percent" required>
-  <button type="submit">저장</button>
-</form>
+    // Firebase에서 데이터 읽어오기
+    onValue(portfolioRef, (snapshot) => {
+      const portfolios = snapshot.val();
+      const labels = [];
+      const data = [];
 
+      for (const id in portfolios) {
+        labels.push(portfolios[id].stockName);
+        data.push(portfolios[id].stockPercent);
+      }
+
+      // 차트 업데이트
+      drawChart('portfolioChart', labels, data, ['#FF6384', '#36A2EB', '#FFCE56'], '80%');
+    });
+
+    // 폼 제출 이벤트 처리
+    const form = document.createElement('form');
+    form.innerHTML = `
+      <label for="stock-name">주식 이름:</label>
+      <input type="text" id="stock-name" required>
+      <label for="stock-percent">주식 비율:</label>
+      <input type="number" id="stock-percent" required>
+      <button type="submit">저장</button>
+    `;
+    document.body.appendChild(form);
+
+    const stockNameInput = document.getElementById("stock-name");
+    const stockPercentInput = document.getElementById("stock-percent");
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const stockName = stockNameInput.value;
+      const stockPercent = stockPercentInput.value;
+
+      // Firebase에 데이터 저장
+      push(portfolioRef, {
+        stockName: stockName,
+        stockPercent: stockPercent
+      });
+
+      // 폼 입력 초기화
+      stockNameInput.value = "";
+      stockPercentInput.value = "";
+    });
   </script>
-  <script type="module">
-  // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.7.1/firebase-analytics.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
-
-  // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
-    apiKey: "AIzaSyAdVxtJBPhfjJFCExi1epjQQGpt3FPMTrQ",
-    authDomain: "stock-pot-62bae.firebaseapp.com",
-    databaseURL: "https://stock-pot-62bae-default-rtdb.firebaseio.com",
-    projectId: "stock-pot-62bae",
-    storageBucket: "stock-pot-62bae.firebasestorage.app",
-    messagingSenderId: "891999801181",
-    appId: "1:891999801181:web:06f0df3269271fb146e2b4",
-    measurementId: "G-7TQMFR10PQ"
-  };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-</script>
-  <script>
-// 폼 제출 이벤트 처리
-const form = document.getElementById("portfolio-form");
-const stockNameInput = document.getElementById("stock-name");
-const stockPercentInput = document.getElementById("stock-percent");
-
-form.addEventListener("submit", (event) => {
-  event.preventDefault();  // 페이지 새로고침 방지
-
-  const stockName = stockNameInput.value;
-  const stockPercent = stockPercentInput.value;
-
-  // Firebase에 데이터 저장
-  portfolioRef.push({
-    stockName: stockName,
-    stockPercent: stockPercent
-  });
-
-  // 폼 입력 초기화
-  stockNameInput.value = "";
-  stockPercentInput.value = "";
-});
-</script>
-<script>
-// 폼 제출 이벤트 처리
-const form = document.getElementById("portfolio-form");
-const stockNameInput = document.getElementById("stock-name");
-const stockPercentInput = document.getElementById("stock-percent");
-
-form.addEventListener("submit", (event) => {
-  event.preventDefault();  // 페이지 새로고침 방지
-
-  const stockName = stockNameInput.value;
-  const stockPercent = stockPercentInput.value;
-
-  // Firebase에 데이터 저장
-  portfolioRef.push({
-    stockName: stockName,
-    stockPercent: stockPercent
-  });
-
-  // 폼 입력 초기화
-  stockNameInput.value = "";
-  stockPercentInput.value = "";
-});
-</script>
-<script>
-// Firebase에서 실시간 데이터 읽기
-portfolioRef.on("value", (snapshot) => {
-  const portfolios = snapshot.val();  // Firebase에서 읽은 데이터
-  const labels = [];
-  const data = [];
-
-  // 데이터를 labels (주식 이름)과 data (주식 비율)로 분리
-  for (const id in portfolios) {
-    labels.push(portfolios[id].stockName);  // 주식 이름
-    data.push(portfolios[id].stockPercent); // 주식 비율
-  }
-
-  // 차트 업데이트 함수 호출
-  updateChart(labels, data);
-});
-
-// 차트 업데이트 함수
-function updateChart(labels, data) {
-  const ctx = document.getElementById("portfolioChart").getContext("2d");
-  new Chart(ctx, {
-    type: "doughnut",  // 차트 타입
-    data: {
-      labels: labels,  // 주식 이름
-      datasets: [{
-        data: data,     // 주식 비율
-        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
-      }]
-    },
-    options: {
-      responsive: true,
-    }
-  });
-}
-</script>
 
 </body>
 </html>
