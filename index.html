@@ -191,9 +191,14 @@
 
       const labels = Object.keys(portfolioMap);
       const values = Object.values(portfolioMap);
-      const backgroundColors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#00D084'];
+      const baseColors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#00D084'];
+      const backgroundColors = [];
 
-      const total = values.reduce((a, b) => a + b, 0);
+      for (let i = 0; i < values.length; i++) {
+        backgroundColors.push(baseColors[i % baseColors.length]);
+      }
+
+      let total = values.reduce((a, b) => a + b, 0);
       if (total < 100) {
         labels.push('현금');
         values.push(100 - total);
@@ -206,7 +211,7 @@
           labels,
           datasets: [{
             data: values,
-            backgroundColor: backgroundColors.slice(0, values.length)
+            backgroundColor: backgroundColors
           }]
         },
         options: {
@@ -225,22 +230,46 @@
     function updateList(data, refPath, publicRef, editable) {
       const list = document.getElementById('portfolioList');
       list.innerHTML = '';
+
+      const portfolioMap = {};
+      let total = 0;
+
       for (const key in data) {
+        const item = data[key];
+        const name = item.stockName;
+        const percent = Number(item.stockPercent);
+        portfolioMap[name] = (portfolioMap[name] || 0) + percent;
+        total += percent;
+      }
+
+      for (const name in portfolioMap) {
+        const percent = portfolioMap[name];
         const li = document.createElement('li');
-        li.textContent = `${data[key].stockName} - ${parseFloat(data[key].stockPercent).toFixed(2)}%`;
+        li.textContent = `${name} - ${percent.toFixed(2)}%`;
+
         if (editable) {
           const delBtn = document.createElement('button');
           delBtn.textContent = '삭제';
           delBtn.className = 'delete-button';
+
           delBtn.onclick = async () => {
-            await remove(child(refPath, key));
+            for (const key in data) {
+              if (
+                data[key].stockName === name &&
+                Number(data[key].stockPercent) === percent
+              ) {
+                await remove(child(refPath, key));
+                break;
+              }
+            }
+
             const publicSnap = await get(publicRef);
             if (publicSnap.exists()) {
               for (const pubKey in publicSnap.val()) {
                 const entry = publicSnap.val()[pubKey];
                 if (
-                  entry.stockName === data[key].stockName &&
-                  Number(entry.stockPercent) === Number(data[key].stockPercent)
+                  entry.stockName === name &&
+                  Number(entry.stockPercent) === percent
                 ) {
                   await remove(child(publicRef, pubKey));
                   break;
@@ -248,9 +277,17 @@
               }
             }
           };
+
           li.appendChild(delBtn);
         }
+
         list.appendChild(li);
+      }
+
+      if (total < 100) {
+        const cashLi = document.createElement('li');
+        cashLi.textContent = `현금 - ${(100 - total).toFixed(2)}%`;
+        list.appendChild(cashLi);
       }
     }
 
