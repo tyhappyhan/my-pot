@@ -55,12 +55,11 @@
   <button id="viewPublicBtn">조회</button>
   <button id="backToMyPortfolioBtn" style="display:none;">내 포트폴리오로 돌아가기</button>
 
-  <!-- 통합된 스크립트 -->
   <script type="module">
     const API_KEY = 'GB5CRBVGLPKO661N';
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-    import { getDatabase, ref, push, onValue, get, remove, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+    import { getDatabase, ref, push, onValue, get, remove, child, set } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
     import {
       getAuth, signInWithPopup, GoogleAuthProvider,
       signOut, onAuthStateChanged
@@ -119,23 +118,27 @@
 
     function setupPortfolio(uid, publicIdLocal) {
       const privateRef = ref(db, `portfolio/${uid}`);
+      const publicRef = ref(db, `public/${publicIdLocal}`);
       if (detachPortfolioListener) detachPortfolioListener();
 
       detachPortfolioListener = onValue(privateRef, async (snapshot) => {
         const data = snapshot.val() || {};
         drawChart(data);
         await updateList(data, privateRef, true);
+        await set(publicRef, data); // 공개 데이터로 복사
       });
 
       const form = document.getElementById('portfolioForm');
+      form.style.display = 'block';
+
       form.onsubmit = async (e) => {
         e.preventDefault();
         const nameInput = document.getElementById('stock-name');
         const percentInput = document.getElementById('stock-percent');
 
-        const rawName = nameInput.value.trim();
+        const name = nameInput.value.trim().toUpperCase();
         const percent = parseFloat(percentInput.value);
-        if (!rawName || isNaN(percent) || percent <= 0 || percent > 100) {
+        if (!name || isNaN(percent) || percent <= 0 || percent > 100) {
           return alert("올바른 값을 입력하세요.");
         }
 
@@ -149,7 +152,7 @@
           return alert(`총 비율이 100%를 넘을 수 없습니다. 현재: ${total.toFixed(2)}%`);
         }
 
-        const newEntry = { stockName: rawName, stockPercent: percent };
+        const newEntry = { stockName: name, stockPercent: percent };
         await push(privateRef, newEntry);
         form.reset();
       };
@@ -162,13 +165,12 @@
     }
 
     async function fetchPrice(symbol) {
-      const upperSymbol = symbol.toUpperCase();
-      if (priceCache[upperSymbol]) return priceCache[upperSymbol];
+      if (priceCache[symbol]) return priceCache[symbol];
       try {
-        const res = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${upperSymbol}&apikey=${API_KEY}`);
+        const res = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`);
         const data = await res.json();
         const price = parseFloat(data["Global Quote"]["05. price"]);
-        priceCache[upperSymbol] = price;
+        priceCache[symbol] = price;
         return price;
       } catch {
         return null;
@@ -223,13 +225,9 @@
       list.innerHTML = '';
 
       const map = {};
-      const keyMap = {};
       for (const key in data) {
         const { stockName, stockPercent } = data[key];
-        const name = stockName;
-        map[name] = (map[name] || 0) + Number(stockPercent);
-        if (!keyMap[name]) keyMap[name] = [];
-        keyMap[name].push(key);
+        map[stockName] = (map[stockName] || 0) + Number(stockPercent);
       }
 
       for (const name in map) {
@@ -243,8 +241,11 @@
           delBtn.textContent = '삭제';
           delBtn.className = 'delete-button';
           delBtn.onclick = async () => {
-            const deletions = keyMap[name].map(key => remove(child(refPath, key)));
-            await Promise.all(deletions);
+            for (const key in data) {
+              if (data[key].stockName === name) {
+                await remove(child(refPath, key));
+              }
+            }
           };
           li.appendChild(delBtn);
         }
@@ -265,12 +266,14 @@
       drawChart(snapshot.val());
       await updateList(snapshot.val(), publicRef, false);
 
+      document.getElementById('portfolioForm').style.display = 'none';
       document.getElementById('backToMyPortfolioBtn').style.display = 'inline';
       document.getElementById('viewPublicBtn').style.display = 'none';
     };
 
     document.getElementById('backToMyPortfolioBtn').onclick = () => {
       setupPortfolio(userUID, publicId);
+      document.getElementById('portfolioForm').style.display = 'block';
       document.getElementById('backToMyPortfolioBtn').style.display = 'none';
       document.getElementById('viewPublicBtn').style.display = 'inline';
     };
