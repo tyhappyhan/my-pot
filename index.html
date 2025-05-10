@@ -53,7 +53,6 @@
   <h1>Stock Portfolio</h1>
 
   <canvas id="portfolioChart" width="300" height="300"></canvas>
-
   <ul id="portfolioList"></ul>
 
   <form id="portfolioForm">
@@ -68,8 +67,9 @@
     <button id="resetButton">초기화</button>
   </div>
 
-  <div id="authSection">
+  <div id="authSection" style="text-align: center; margin-top: 20px;">
     <button id="googleLoginBtn">Google로 로그인</button>
+    <span id="userInfo" style="display:none; margin-left: 10px;"></span>
     <button id="logoutBtn" style="display:none;">로그아웃</button>
   </div>
 
@@ -101,11 +101,13 @@
     const provider = new GoogleAuthProvider();
 
     let userUID = null;
-    let chartInstance = null;
-    let isFormSetup = false;
+    let chartInstance;
 
     document.getElementById('googleLoginBtn').onclick = () => {
       signInWithPopup(auth, provider)
+        .then((result) => {
+          userUID = result.user.uid;
+        })
         .catch((error) => {
           alert("로그인 실패: " + error.message);
         });
@@ -113,18 +115,26 @@
 
     document.getElementById('logoutBtn').onclick = () => {
       signOut(auth);
-      document.getElementById('logoutBtn').style.display = 'none';
-      alert('로그아웃되었습니다.');
     };
 
     onAuthStateChanged(auth, (user) => {
+      const googleLoginBtn = document.getElementById('googleLoginBtn');
+      const logoutBtn = document.getElementById('logoutBtn');
+      const userInfo = document.getElementById('userInfo');
+
       if (user) {
         userUID = user.uid;
-        document.getElementById('logoutBtn').style.display = 'inline';
+        googleLoginBtn.style.display = 'none';
+        logoutBtn.style.display = 'inline';
+        userInfo.style.display = 'inline';
+        userInfo.textContent = user.email;
         setupPortfolio(userUID);
       } else {
         userUID = null;
-        document.getElementById('logoutBtn').style.display = 'none';
+        googleLoginBtn.style.display = 'inline';
+        logoutBtn.style.display = 'none';
+        userInfo.style.display = 'none';
+        userInfo.textContent = '';
       }
     });
 
@@ -137,55 +147,52 @@
         updateList(data, portfolioRef);
       });
 
-      if (!isFormSetup) {
-        const form = document.getElementById('portfolioForm');
-        const nameInput = document.getElementById('stock-name');
-        const percentInput = document.getElementById('stock-percent');
+      const form = document.getElementById('portfolioForm');
+      const nameInput = document.getElementById('stock-name');
+      const percentInput = document.getElementById('stock-percent');
 
-        form.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const name = nameInput.value.trim();
-          const percent = parseFloat(percentInput.value);
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = nameInput.value.trim();
+        const percent = parseFloat(percentInput.value);
 
-          if (!name || isNaN(percent) || percent <= 0 || percent > 100) {
-            alert("올바른 이름과 0~100 사이의 비율을 입력하세요.");
-            return;
+        if (!name || isNaN(percent) || percent <= 0 || percent > 100) {
+          alert("올바른 이름과 0~100 사이의 비율을 입력하세요.");
+          return;
+        }
+
+        const snapshot = await get(portfolioRef);
+        const data = snapshot.val();
+        let total = 0;
+
+        if (data) {
+          for (const key in data) {
+            total += Number(data[key].stockPercent);
           }
+        }
 
-          const snapshot = await get(portfolioRef);
-          const data = snapshot.val();
-          let total = 0;
+        if (total + percent > 100) {
+          alert(`총 비율이 100%를 넘을 수 없습니다. 현재: ${total}%, 추가 시: ${total + percent}%`);
+          return;
+        }
 
-          if (data) {
-            for (const key in data) {
-              total += Number(data[key].stockPercent);
-            }
-          }
-
-          if (total + percent > 100) {
-            alert(`총 비율이 100%를 넘을 수 없습니다. 현재: ${total}%, 추가 시: ${total + percent}%`);
-            return;
-          }
-
-          await push(portfolioRef, {
-            stockName: name,
-            stockPercent: percent
-          });
-
-          nameInput.value = '';
-          percentInput.value = '';
+        await push(portfolioRef, {
+          stockName: name,
+          stockPercent: percent
         });
 
-        document.getElementById('resetButton').addEventListener('click', async () => {
-          await remove(portfolioRef);
-        });
+        nameInput.value = '';
+        percentInput.value = '';
+      });
 
-        isFormSetup = true;
-      }
+      document.getElementById('resetButton').addEventListener('click', async () => {
+        await remove(portfolioRef);
+      });
     }
 
     function drawChart(rawData) {
       const portfolioMap = {};
+
       for (const key in rawData) {
         const item = rawData[key];
         const name = item.stockName;
@@ -201,6 +208,7 @@
       const backgroundColors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#00D084'];
 
       const total = values.reduce((a, b) => a + b, 0);
+
       if (total < 100) {
         labels.push('나머지');
         values.push(100 - total);
@@ -224,7 +232,7 @@
             legend: { display: true },
             tooltip: {
               callbacks: {
-                label: function (context) {
+                label: function(context) {
                   return `${context.label}: ${context.raw}%`;
                 }
               }
