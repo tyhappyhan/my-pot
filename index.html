@@ -24,7 +24,7 @@
 
   <form id="portfolioForm">
     <label>주식 이름:</label><input type="text" id="stock-name" required />
-    <label>비율(%):</label><input type="number" id="stock-percent" required min="0" max="100" step="0.1" />
+    <label>비율(%):</label><input type="number" id="stock-percent" required min="0" max="100" step="0.01" />
     <button type="submit">저장</button>
   </form>
 
@@ -43,7 +43,6 @@
     <button id="viewPublicBtn">다른 사람 포트폴리오 보기</button>
   </div>
 
-  <!-- '내 포트폴리오로 돌아가기' 버튼 추가 -->
   <div class="center">
     <button id="backToMyPortfolioBtn" style="display:none;">내 포트폴리오로 돌아가기</button>
   </div>
@@ -119,7 +118,7 @@
       form.onsubmit = async (e) => {
         e.preventDefault();
         const name = document.getElementById('stock-name').value.trim();
-        const percent = parseFloat(document.getElementById('stock-percent').value); // 소수점 값 받기
+        const percent = parseFloat(document.getElementById('stock-percent').value);
         if (!name || isNaN(percent) || percent <= 0 || percent > 100) {
           return alert("올바른 값을 입력하세요.");
         }
@@ -159,7 +158,12 @@
 
       const labels = Object.keys(portfolioMap);
       const values = Object.values(portfolioMap);
-      const backgroundColors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#00D084'];
+      const backgroundColors = [
+        '#FF6384', '#36A2EB', '#FFCE56',
+        '#4BC0C0', '#9966FF', '#00D084',
+        '#FF9F40', '#C9CBCF', '#8D6E63',
+        '#BA68C8', '#4DD0E1', '#AED581'
+      ];
 
       const total = values.reduce((a, b) => a + b, 0);
       if (total < 100) {
@@ -179,11 +183,19 @@
         },
         options: {
           cutout: '80%',
+          elements: {
+            arc: {
+              borderWidth: 0 // 항목 간 간격 제거
+            }
+          },
           plugins: {
             tooltip: {
               callbacks: {
-                label: ctx => `${ctx.label}: ${ctx.raw}%`
+                label: ctx => `${ctx.label}: ${ctx.raw.toFixed(2)}%`
               }
+            },
+            legend: {
+              position: 'bottom'
             }
           }
         }
@@ -213,23 +225,16 @@
       const publicRef = ref(db, `public/${userId}`);
       const snapshot = await get(publicRef);
       if (!snapshot.exists()) return alert("해당 사용자의 포트폴리오가 없습니다.");
-      
-      // 다른 사람 포트폴리오 보여주기
-      drawChart(snapshot.val());
-      updateList(snapshot.val(), publicRef, false); // 삭제 비활성화
 
-      // '내 포트폴리오로 돌아가기' 버튼 보이기
+      drawChart(snapshot.val());
+      updateList(snapshot.val(), publicRef, false);
+
       document.getElementById('backToMyPortfolioBtn').style.display = 'inline';
-      
-      // '다른 사람 포트폴리오 보기' 버튼 숨기기
       document.getElementById('viewPublicBtn').style.display = 'none';
     };
 
     document.getElementById('backToMyPortfolioBtn').onclick = () => {
-      // 내 포트폴리오로 돌아가기
       setupPortfolio(userUID, publicId);
-
-      // 버튼 상태 변경
       document.getElementById('backToMyPortfolioBtn').style.display = 'none';
       document.getElementById('viewPublicBtn').style.display = 'inline';
     };
