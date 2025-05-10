@@ -8,12 +8,10 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 2rem; background: #f9f9f9; }
     h1 { font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; text-align: center; }
-
     form, .center { text-align: center; margin-top: 20px; }
     canvas { max-width: 400px; margin: auto; display: block; }
     ul { list-style: none; padding: 0; text-align: center; }
     li { margin: 5px 0; }
-
     input[type="text"], input[type="number"] {
       padding: 8px 12px;
       border-radius: 6px;
@@ -22,12 +20,10 @@
       margin: 5px;
       transition: border 0.2s ease;
     }
-
     input:focus {
       border-color: #4facfe;
       outline: none;
     }
-
     button {
       padding: 10px 16px;
       margin: 5px;
@@ -40,17 +36,14 @@
       transition: transform 0.15s ease, box-shadow 0.15s ease;
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-
     button:hover {
       transform: translateY(-2px);
       box-shadow: 0 6px 12px rgba(0,0,0,0.15);
     }
-
     button:active {
       transform: translateY(0);
       box-shadow: 0 3px 6px rgba(0,0,0,0.2);
     }
-
     .delete-button {
       background: linear-gradient(to right, #f44336, #e53935);
     }
@@ -58,7 +51,6 @@
 </head>
 <body>
   <h1>Stock Portfolio</h1>
-
   <canvas id="portfolioChart"></canvas>
   <ul id="portfolioList"></ul>
 
@@ -146,14 +138,14 @@
       }
     });
 
-    function setupPortfolio(uid, publicId) {
+    function setupPortfolio(uid, publicIdLocal) {
       const privateRef = ref(db, `portfolio/${uid}`);
-      const publicRef = ref(db, `public/${publicId}`);
+      const publicRef = ref(db, `public/${publicIdLocal}`);
 
       onValue(privateRef, (snapshot) => {
         const data = snapshot.val() || {};
         drawChart(data);
-        updateList(data, privateRef, true);
+        updateList(data, privateRef, publicRef, true);
       });
 
       const form = document.getElementById('portfolioForm');
@@ -203,9 +195,9 @@
 
       const total = values.reduce((a, b) => a + b, 0);
       if (total < 100) {
-        labels.push('현금');  // '나머지' 대신 '현금'으로 변경
+        labels.push('현금');
         values.push(100 - total);
-        backgroundColors.push('#e0e0e0');  // 회색 고정
+        backgroundColors.push('#e0e0e0');
       }
 
       chartInstance = new Chart(ctx, {
@@ -230,7 +222,7 @@
       });
     }
 
-    function updateList(data, refPath, editable) {
+    function updateList(data, refPath, publicRef, editable) {
       const list = document.getElementById('portfolioList');
       list.innerHTML = '';
       for (const key in data) {
@@ -240,7 +232,22 @@
           const delBtn = document.createElement('button');
           delBtn.textContent = '삭제';
           delBtn.className = 'delete-button';
-          delBtn.onclick = () => remove(child(refPath, key));
+          delBtn.onclick = async () => {
+            await remove(child(refPath, key));
+            const publicSnap = await get(publicRef);
+            if (publicSnap.exists()) {
+              for (const pubKey in publicSnap.val()) {
+                const entry = publicSnap.val()[pubKey];
+                if (
+                  entry.stockName === data[key].stockName &&
+                  Number(entry.stockPercent) === Number(data[key].stockPercent)
+                ) {
+                  await remove(child(publicRef, pubKey));
+                  break;
+                }
+              }
+            }
+          };
           li.appendChild(delBtn);
         }
         list.appendChild(li);
@@ -255,7 +262,7 @@
       if (!snapshot.exists()) return alert("해당 사용자의 포트폴리오가 없습니다.");
 
       drawChart(snapshot.val());
-      updateList(snapshot.val(), publicRef, false);
+      updateList(snapshot.val(), publicRef, publicRef, false);
 
       document.getElementById('backToMyPortfolioBtn').style.display = 'inline';
       document.getElementById('viewPublicBtn').style.display = 'none';
