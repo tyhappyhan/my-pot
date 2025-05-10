@@ -55,7 +55,7 @@
     <button id="resetButton">초기화</button>
   </div>
 
-  <div id="authSection" class="center">
+  <div class="center">
     <button id="googleLoginBtn">Google로 로그인</button>
     <span id="userInfo" style="display:none;"></span>
     <button id="logoutBtn" style="display:none;">로그아웃</button>
@@ -74,7 +74,9 @@
     const API_KEY = 'GB5CRBVGLPKO661N';
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-    import { getDatabase, ref, push, onValue, get, remove, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+    import {
+      getDatabase, ref, push, onValue, get, remove, child, off
+    } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
     import {
       getAuth, signInWithPopup, GoogleAuthProvider,
       signOut, onAuthStateChanged
@@ -98,11 +100,13 @@
 
     let userUID = null;
     let publicId = null;
-    let chartInstance;
+    let chartInstance = null;
+    let currentRef = null;
 
     document.getElementById('googleLoginBtn').onclick = () => {
       signInWithPopup(auth, provider).catch(err => alert("로그인 실패: " + err.message));
     };
+
     document.getElementById('logoutBtn').onclick = () => signOut(auth);
 
     onAuthStateChanged(auth, (user) => {
@@ -131,6 +135,10 @@
     function setupPortfolio(uid, publicIdLocal) {
       const privateRef = ref(db, `portfolio/${uid}`);
       const publicRef = ref(db, `public/${publicIdLocal}`);
+
+      // 리스너 중복 방지
+      if (currentRef) off(currentRef);
+      currentRef = privateRef;
 
       onValue(privateRef, async (snapshot) => {
         const data = snapshot.val() || {};
@@ -174,7 +182,7 @@
         const res = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`);
         const data = await res.json();
         return parseFloat(data["Global Quote"]["05. price"]);
-      } catch (e) {
+      } catch {
         return null;
       }
     }
@@ -193,9 +201,10 @@
       const values = Object.values(portfolioMap);
       const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#00D084'];
 
-      if (values.reduce((a, b) => a + b, 0) < 100) {
+      const sum = values.reduce((a, b) => a + b, 0);
+      if (sum < 100) {
         labels.push("현금");
-        values.push(100 - values.reduce((a, b) => a + b, 0));
+        values.push(100 - sum);
         colors.push("#e0e0e0");
       }
 
@@ -270,6 +279,7 @@
       const snapshot = await get(publicRef);
       if (!snapshot.exists()) return alert("해당 사용자의 포트폴리오가 없습니다.");
 
+      if (currentRef) off(currentRef);
       drawChart(snapshot.val());
       await updateList(snapshot.val(), publicRef, publicRef, false);
 
