@@ -24,7 +24,7 @@
 
   <form id="portfolioForm">
     <label>주식 이름:</label><input type="text" id="stock-name" required />
-    <label>비율(%):</label><input type="number" id="stock-percent" required min="0" max="100" />
+    <label>비율(%):</label><input type="number" id="stock-percent" required min="0" max="100" step="0.1" />
     <button type="submit">저장</button>
   </form>
 
@@ -119,7 +119,7 @@
       form.onsubmit = async (e) => {
         e.preventDefault();
         const name = document.getElementById('stock-name').value.trim();
-        const percent = parseFloat(document.getElementById('stock-percent').value);
+        const percent = parseFloat(document.getElementById('stock-percent').value); // 소수점 값 받기
         if (!name || isNaN(percent) || percent <= 0 || percent > 100) {
           return alert("올바른 값을 입력하세요.");
         }
