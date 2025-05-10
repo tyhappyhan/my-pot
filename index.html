@@ -102,6 +102,7 @@
 
     let userUID = null;
     let chartInstance;
+    let formSetupDone = false;
 
     document.getElementById('googleLoginBtn').onclick = () => {
       signInWithPopup(auth, provider)
@@ -147,47 +148,51 @@
         updateList(data, portfolioRef);
       });
 
-      const form = document.getElementById('portfolioForm');
-      const nameInput = document.getElementById('stock-name');
-      const percentInput = document.getElementById('stock-percent');
+      if (!formSetupDone) {
+        const form = document.getElementById('portfolioForm');
+        const nameInput = document.getElementById('stock-name');
+        const percentInput = document.getElementById('stock-percent');
 
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const name = nameInput.value.trim();
-        const percent = parseFloat(percentInput.value);
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const name = nameInput.value.trim();
+          const percent = parseFloat(percentInput.value);
 
-        if (!name || isNaN(percent) || percent <= 0 || percent > 100) {
-          alert("올바른 이름과 0~100 사이의 비율을 입력하세요.");
-          return;
-        }
-
-        const snapshot = await get(portfolioRef);
-        const data = snapshot.val();
-        let total = 0;
-
-        if (data) {
-          for (const key in data) {
-            total += Number(data[key].stockPercent);
+          if (!name || isNaN(percent) || percent <= 0 || percent > 100) {
+            alert("올바른 이름과 0~100 사이의 비율을 입력하세요.");
+            return;
           }
-        }
 
-        if (total + percent > 100) {
-          alert(`총 비율이 100%를 넘을 수 없습니다. 현재: ${total}%, 추가 시: ${total + percent}%`);
-          return;
-        }
+          const snapshot = await get(portfolioRef);
+          const data = snapshot.val();
+          let total = 0;
 
-        await push(portfolioRef, {
-          stockName: name,
-          stockPercent: percent
+          if (data) {
+            for (const key in data) {
+              total += Number(data[key].stockPercent);
+            }
+          }
+
+          if (total + percent > 100) {
+            alert(`총 비율이 100%를 넘을 수 없습니다. 현재: ${total}%, 추가 시: ${total + percent}%`);
+            return;
+          }
+
+          await push(portfolioRef, {
+            stockName: name,
+            stockPercent: percent
+          });
+
+          nameInput.value = '';
+          percentInput.value = '';
         });
 
-        nameInput.value = '';
-        percentInput.value = '';
-      });
+        document.getElementById('resetButton').addEventListener('click', async () => {
+          await remove(portfolioRef);
+        });
 
-      document.getElementById('resetButton').addEventListener('click', async () => {
-        await remove(portfolioRef);
-      });
+        formSetupDone = true;
+      }
     }
 
     function drawChart(rawData) {
