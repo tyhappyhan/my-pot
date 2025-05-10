@@ -6,7 +6,6 @@
   <title>My Pot</title>
   <meta name="description" content="My Pot는 내가 만든 첫 번째 웹사이트입니다." />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
-
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -106,40 +105,24 @@
 
       const labels = Object.keys(portfolioMap);
       const values = Object.values(portfolioMap);
-
-      if (labels.length === 0) {
-        chartInstance = new Chart(ctx, {
-          type: 'doughnut',
-          data: {
-            labels: ['데이터 없음'],
-            datasets: [{
-              data: [1],
-              backgroundColor: ['#e0e0e0']
-            }]
-          },
-          options: {
-            plugins: {
-              legend: { display: false },
-              tooltip: { enabled: false }
-            },
-            cutout: '80%',
-            responsive: true
-          }
-        });
-        return;
-      }
+      const backgroundColors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#00D084'];
 
       const total = values.reduce((a, b) => a + b, 0);
-      const percentageValues = values.map(val => ((val / total) * 100).toFixed(2));
+
+      if (total < 100) {
+        labels.push('나머지');
+        values.push(100 - total);
+        backgroundColors.push('#e0e0e0');
+      }
 
       chartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: labels,
+          labels,
           datasets: [{
             label: '포트폴리오',
-            data: percentageValues,
-            backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#00D084'],
+            data: values,
+            backgroundColor: backgroundColors.slice(0, values.length)
           }]
         },
         options: {
@@ -169,7 +152,7 @@
         const deleteBtn = document.createElement('button');
         deleteBtn.textContent = '삭제';
         deleteBtn.className = 'delete-button';
-        deleteBtn.onclick = () => remove(child(portfolioRef, key)); // confirm 없이 삭제
+        deleteBtn.onclick = () => remove(child(portfolioRef, key));
         li.appendChild(deleteBtn);
 
         list.appendChild(li);
@@ -226,4 +209,3 @@
   </script>
 </body>
 </html>
-
