@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Stock Portfolio App</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -46,7 +46,6 @@
   </form>
 
   <ul id="portfolioList"></ul>
-
   <canvas id="portfolioChart"></canvas>
 
   <hr/>
@@ -59,7 +58,7 @@
     const API_KEY = 'GB5CRBVGLPKO661N';
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-    import { getDatabase, ref, push, onValue, get, remove, child, set } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+    import { getDatabase, ref, push, onValue, get, remove, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
     import {
       getAuth, signInWithPopup, GoogleAuthProvider,
       signOut, onAuthStateChanged
@@ -118,19 +117,15 @@
 
     function setupPortfolio(uid, publicIdLocal) {
       const privateRef = ref(db, `portfolio/${uid}`);
-      const publicRef = ref(db, `public/${publicIdLocal}`);
       if (detachPortfolioListener) detachPortfolioListener();
 
       detachPortfolioListener = onValue(privateRef, async (snapshot) => {
         const data = snapshot.val() || {};
         drawChart(data);
         await updateList(data, privateRef, true);
-        await set(publicRef, data); // 공개 데이터로 복사
       });
 
       const form = document.getElementById('portfolioForm');
-      form.style.display = 'block';
-
       form.onsubmit = async (e) => {
         e.preventDefault();
         const nameInput = document.getElementById('stock-name');
@@ -195,7 +190,12 @@
       if (total < 100) {
         labels.push("현금");
         values.push(100 - total);
-        colors.push("#e0e0e0");
+        colors.push("#e0e0e0"); // 회색 고정
+      }
+
+      // 부족한 색상 보완
+      while (colors.length < labels.length) {
+        colors.push('#'+Math.floor(Math.random()*16777215).toString(16));
       }
 
       chartInstance = new Chart(ctx, {
@@ -266,14 +266,12 @@
       drawChart(snapshot.val());
       await updateList(snapshot.val(), publicRef, false);
 
-      document.getElementById('portfolioForm').style.display = 'none';
       document.getElementById('backToMyPortfolioBtn').style.display = 'inline';
       document.getElementById('viewPublicBtn').style.display = 'none';
     };
 
     document.getElementById('backToMyPortfolioBtn').onclick = () => {
       setupPortfolio(userUID, publicId);
-      document.getElementById('portfolioForm').style.display = 'block';
       document.getElementById('backToMyPortfolioBtn').style.display = 'none';
       document.getElementById('viewPublicBtn').style.display = 'inline';
     };
