@@ -14,7 +14,7 @@
     li { margin: 5px 0; }
     input[type="text"], input[type="number"] {
       padding: 8px 12px;
-      border-radius: 6px;
+      border-radius: 4px;
       border: 1px solid #ccc;
       font-size: 0.95rem;
       margin: 5px;
@@ -24,28 +24,41 @@
       border-color: #4facfe;
       outline: none;
     }
+
     button {
-      padding: 10px 16px;
-      margin: 5px;
-      border: none;
-      border-radius: 8px;
-      background: linear-gradient(to right, #4facfe, #00f2fe);
-      color: white;
-      font-size: 0.95rem;
+      padding: 8px 14px;
+      margin: 4px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: #fff;
+      color: #222;
+      font-size: 0.9rem;
       cursor: pointer;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      transition: background-color 0.2s ease, border-color 0.2s ease;
     }
+
     button:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+      background-color: #f5f5f5;
+      border-color: #999;
     }
+
     button:active {
-      transform: translateY(0);
-      box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+      background-color: #ebebeb;
+      border-color: #888;
     }
+
     .delete-button {
-      background: linear-gradient(to right, #f44336, #e53935);
+      background-color: #e74c3c;
+      color: #fff;
+      border: none;
+    }
+
+    .delete-button:hover {
+      background-color: #c0392b;
+    }
+
+    .delete-button:active {
+      background-color: #a93226;
     }
   </style>
 </head>
