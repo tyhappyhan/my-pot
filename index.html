@@ -133,9 +133,9 @@
         const nameInput = document.getElementById('stock-name');
         const percentInput = document.getElementById('stock-percent');
 
-        const name = nameInput.value.trim().toUpperCase();
+        const rawName = nameInput.value.trim();
         const percent = parseFloat(percentInput.value);
-        if (!name || isNaN(percent) || percent <= 0 || percent > 100) {
+        if (!rawName || isNaN(percent) || percent <= 0 || percent > 100) {
           return alert("올바른 값을 입력하세요.");
         }
 
@@ -149,7 +149,7 @@
           return alert(`총 비율이 100%를 넘을 수 없습니다. 현재: ${total.toFixed(2)}%`);
         }
 
-        const newEntry = { stockName: name, stockPercent: percent };
+        const newEntry = { stockName: rawName, stockPercent: percent };
         await push(privateRef, newEntry);
         form.reset();
       };
@@ -162,12 +162,13 @@
     }
 
     async function fetchPrice(symbol) {
-      if (priceCache[symbol]) return priceCache[symbol];
+      const upperSymbol = symbol.toUpperCase();
+      if (priceCache[upperSymbol]) return priceCache[upperSymbol];
       try {
-        const res = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`);
+        const res = await fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${upperSymbol}&apikey=${API_KEY}`);
         const data = await res.json();
         const price = parseFloat(data["Global Quote"]["05. price"]);
-        priceCache[symbol] = price;
+        priceCache[upperSymbol] = price;
         return price;
       } catch {
         return null;
@@ -222,9 +223,13 @@
       list.innerHTML = '';
 
       const map = {};
+      const keyMap = {};
       for (const key in data) {
         const { stockName, stockPercent } = data[key];
-        map[stockName] = (map[stockName] || 0) + Number(stockPercent);
+        const name = stockName;
+        map[name] = (map[name] || 0) + Number(stockPercent);
+        if (!keyMap[name]) keyMap[name] = [];
+        keyMap[name].push(key);
       }
 
       for (const name in map) {
@@ -238,11 +243,8 @@
           delBtn.textContent = '삭제';
           delBtn.className = 'delete-button';
           delBtn.onclick = async () => {
-            for (const key in data) {
-              if (data[key].stockName === name) {
-                await remove(child(refPath, key));
-              }
-            }
+            const deletions = keyMap[name].map(key => remove(child(refPath, key)));
+            await Promise.all(deletions);
           };
           li.appendChild(delBtn);
         }
