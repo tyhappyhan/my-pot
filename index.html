@@ -24,29 +24,50 @@
       border-color: #4facfe;
       outline: none;
     }
+
+    /* 애니메이션 효과가 포함된 버튼 스타일 */
     button {
-      padding: 10px 16px;
-      margin: 5px;
-      border: none;
+      padding: 10px 18px;
+      margin: 6px;
+      border: 1px solid #ccc;
       border-radius: 8px;
-      background: linear-gradient(to right, #4facfe, #00f2fe);
-      color: white;
-      font-size: 0.95rem;
+      background-color: white;
+      color: #333;
+      font-size: 1rem;
+      font-weight: 500;
       cursor: pointer;
-      transition: transform 0.15s ease, box-shadow 0.15s ease;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      transition:
+        background-color 0.25s ease,
+        border-color 0.25s ease,
+        transform 0.15s ease,
+        box-shadow 0.15s ease;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.06);
     }
+
     button:hover {
+      background-color: #f3f3f3;
+      border-color: #999;
       transform: translateY(-2px);
-      box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.08);
     }
+
     button:active {
       transform: translateY(0);
-      box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.12);
     }
+
+    /* 삭제 버튼 스타일 */
     .delete-button {
-      background: linear-gradient(to right, #f44336, #e53935);
+      border-color: #e57373;
+      color: #e53935;
+      background-color: white;
     }
+
+    .delete-button:hover {
+      background-color: #fcebea;
+      border-color: #e53935;
+    }
+
   </style>
 </head>
 <body>
@@ -191,14 +212,9 @@
 
       const labels = Object.keys(portfolioMap);
       const values = Object.values(portfolioMap);
-      const baseColors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#00D084'];
-      const backgroundColors = [];
+      const backgroundColors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#00D084'];
 
-      for (let i = 0; i < values.length; i++) {
-        backgroundColors.push(baseColors[i % baseColors.length]);
-      }
-
-      let total = values.reduce((a, b) => a + b, 0);
+      const total = values.reduce((a, b) => a + b, 0);
       if (total < 100) {
         labels.push('현금');
         values.push(100 - total);
@@ -211,7 +227,7 @@
           labels,
           datasets: [{
             data: values,
-            backgroundColor: backgroundColors
+            backgroundColor: backgroundColors.slice(0, values.length)
           }]
         },
         options: {
@@ -230,46 +246,22 @@
     function updateList(data, refPath, publicRef, editable) {
       const list = document.getElementById('portfolioList');
       list.innerHTML = '';
-
-      const portfolioMap = {};
-      let total = 0;
-
       for (const key in data) {
-        const item = data[key];
-        const name = item.stockName;
-        const percent = Number(item.stockPercent);
-        portfolioMap[name] = (portfolioMap[name] || 0) + percent;
-        total += percent;
-      }
-
-      for (const name in portfolioMap) {
-        const percent = portfolioMap[name];
         const li = document.createElement('li');
-        li.textContent = `${name} - ${percent.toFixed(2)}%`;
-
+        li.textContent = `${data[key].stockName} - ${parseFloat(data[key].stockPercent).toFixed(2)}%`;
         if (editable) {
           const delBtn = document.createElement('button');
           delBtn.textContent = '삭제';
           delBtn.className = 'delete-button';
-
           delBtn.onclick = async () => {
-            for (const key in data) {
-              if (
-                data[key].stockName === name &&
-                Number(data[key].stockPercent) === percent
-              ) {
-                await remove(child(refPath, key));
-                break;
-              }
-            }
-
+            await remove(child(refPath, key));
             const publicSnap = await get(publicRef);
             if (publicSnap.exists()) {
               for (const pubKey in publicSnap.val()) {
                 const entry = publicSnap.val()[pubKey];
                 if (
-                  entry.stockName === name &&
-                  Number(entry.stockPercent) === percent
+                  entry.stockName === data[key].stockName &&
+                  Number(entry.stockPercent) === Number(data[key].stockPercent)
                 ) {
                   await remove(child(publicRef, pubKey));
                   break;
@@ -277,17 +269,9 @@
               }
             }
           };
-
           li.appendChild(delBtn);
         }
-
         list.appendChild(li);
-      }
-
-      if (total < 100) {
-        const cashLi = document.createElement('li');
-        cashLi.textContent = `현금 - ${(100 - total).toFixed(2)}%`;
-        list.appendChild(cashLi);
       }
     }
 
