@@ -249,10 +249,13 @@
 
       for (const key in data) {
         const item = data[key];
-        const name = item.stockName;
-        const percent = Number(item.stockPercent);
-        portfolioMap[name] = (portfolioMap[name] || 0) + percent;
-        total += percent;
+        // 데이터가 존재하는지 확인
+        if (item) {
+          const name = item.stockName;
+          const percent = Number(item.stockPercent);
+          portfolioMap[name] = (portfolioMap[name] || 0) + percent;
+          total += percent;
+        }
       }
 
       for (const name in portfolioMap) {
