@@ -7,24 +7,23 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 2rem; background: #f9f9f9; }
-    h1 { text-align: center; }
+    h1 { font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; text-align: center; }
     form, .center { text-align: center; margin-top: 20px; }
     canvas { max-width: 400px; margin: auto; display: block; }
     ul { list-style: none; padding: 0; text-align: center; }
     li { margin: 5px 0; }
     .price-info { font-size: 0.85rem; color: #555; margin-left: 6px; }
-    input[type="text"], input[type="number"], button {
-      padding: 8px 12px;
-      margin: 5px;
-      border-radius: 4px;
-      border: 1px solid #ccc;
-      font-size: 0.95rem;
+    input[type="text"], input[type="number"] {
+      padding: 8px 12px; border-radius: 4px; border: 1px solid #ccc;
+      font-size: 0.95rem; margin: 5px;
+    }
+    button {
+      padding: 8px 14px; margin: 4px; border: 1px solid #ccc;
+      border-radius: 4px; background-color: #fff; color: #222;
+      font-size: 0.9rem; cursor: pointer;
     }
     .delete-button {
-      background-color: #e74c3c;
-      color: #fff;
-      border: none;
-      margin-left: 6px;
+      background-color: #e74c3c; color: #fff; border: none; margin-left: 6px;
     }
   </style>
 </head>
@@ -34,19 +33,15 @@
   <ul id="portfolioList"></ul>
 
   <form id="portfolioForm">
-    <input type="text" id="stock-name" placeholder="티커" required />
-    <input type="number" id="stock-percent" placeholder="비율(%)" step="0.01" required min="0" max="100" />
+    <label>주식 이름/티커:</label>
+    <input type="text" id="stock-name" required />
+    <label>비율(%):</label>
+    <input type="number" id="stock-percent" step="0.01" required min="0" max="100" />
     <button type="submit">저장</button>
   </form>
 
   <div class="center">
     <button id="resetButton">초기화</button>
-  </div>
-
-  <div class="center">
-    <button id="googleLoginBtn">Google로 로그인</button>
-    <span id="userInfo" style="display:none;"></span>
-    <button id="logoutBtn" style="display:none;">로그아웃</button>
   </div>
 
   <div class="center">
@@ -58,11 +53,17 @@
     <button id="backToMyPortfolioBtn" style="display:none;">내 포트폴리오로 돌아가기</button>
   </div>
 
+  <div class="center" id="authSection">
+    <button id="googleLoginBtn">Google로 로그인</button>
+    <span id="userInfo" style="display:none;"></span>
+    <button id="logoutBtn" style="display:none;">로그아웃</button>
+  </div>
+
   <script type="module">
     const API_KEY = 'GB5CRBVGLPKO661N';
 
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-    import { getDatabase, ref, push, onValue, get, remove, set } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+    import { getDatabase, ref, push, onValue, get, remove } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
     import {
       getAuth, signInWithPopup, GoogleAuthProvider,
       signOut, onAuthStateChanged
@@ -87,8 +88,11 @@
     let userUID = null;
     let publicId = null;
     let chartInstance;
+    let unsubscribe = null;
 
-    document.getElementById('googleLoginBtn').onclick = () => signInWithPopup(auth, provider);
+    document.getElementById('googleLoginBtn').onclick = () => {
+      signInWithPopup(auth, provider).catch(err => alert("로그인 실패: " + err.message));
+    };
     document.getElementById('logoutBtn').onclick = () => signOut(auth);
 
     onAuthStateChanged(auth, (user) => {
@@ -111,6 +115,7 @@
         logoutBtn.style.display = 'none';
         userInfo.style.display = 'none';
         userInfo.textContent = '';
+        if (unsubscribe) unsubscribe();
       }
     });
 
@@ -118,11 +123,11 @@
       const privateRef = ref(db, `portfolio/${uid}`);
       const publicRef = ref(db, `public/${publicIdLocal}`);
 
-      onValue(privateRef, async (snapshot) => {
+      if (unsubscribe) unsubscribe();  // 이전 리스너 제거
+      unsubscribe = onValue(privateRef, async (snapshot) => {
         const data = snapshot.val() || {};
         drawChart(data);
         await updateList(data, privateRef, publicRef, true);
-        await set(publicRef, data); // 여기서 public 데이터를 private와 동기화
       });
 
       document.getElementById('portfolioForm').onsubmit = async (e) => {
@@ -143,7 +148,9 @@
           return alert(`총 비율이 100%를 넘을 수 없습니다. 현재: ${total.toFixed(2)}%`);
         }
 
-        await push(privateRef, { stockName: name, stockPercent: percent });
+        const newEntry = { stockName: name, stockPercent: percent };
+        await push(privateRef, newEntry);
+        await push(publicRef, newEntry);
         e.target.reset();
       };
 
@@ -163,30 +170,25 @@
       }
     }
 
-    function drawChart(data) {
+    function drawChart(rawData) {
       const ctx = document.getElementById('portfolioChart').getContext('2d');
       if (chartInstance) chartInstance.destroy();
 
-      const labels = [];
-      const values = [];
+      const portfolioMap = {};
+      for (const key in rawData) {
+        const item = rawData[key];
+        portfolioMap[item.stockName] = (portfolioMap[item.stockName] || 0) + Number(item.stockPercent);
+      }
+
+      const labels = Object.keys(portfolioMap);
+      const values = Object.values(portfolioMap);
       const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#00D084'];
-
-      const grouped = {};
-      for (const key in data) {
-        const item = data[key];
-        grouped[item.stockName] = (grouped[item.stockName] || 0) + Number(item.stockPercent);
-      }
-
-      for (const name in grouped) {
-        labels.push(name);
-        values.push(grouped[name]);
-      }
 
       const sum = values.reduce((a, b) => a + b, 0);
       if (sum < 100) {
-        labels.push('현금');
+        labels.push("현금");
         values.push(100 - sum);
-        colors.push('#e0e0e0');
+        colors.push("#e0e0e0");
       }
 
       chartInstance = new Chart(ctx, {
@@ -214,11 +216,15 @@
     async function updateList(data, privateRef, publicRef, editable) {
       const list = document.getElementById('portfolioList');
       list.innerHTML = '';
+
       const grouped = {};
+      const keyMap = {};
 
       for (const key in data) {
         const { stockName, stockPercent } = data[key];
         grouped[stockName] = (grouped[stockName] || 0) + Number(stockPercent);
+        if (!keyMap[stockName]) keyMap[stockName] = [];
+        keyMap[stockName].push(key);
       }
 
       for (const name in grouped) {
@@ -227,17 +233,16 @@
         li.innerHTML = `${name} - ${grouped[name].toFixed(2)}% <span class="price-info">${price ? `(${price.toFixed(2)} USD)` : ''}</span>`;
 
         if (editable) {
-          const btn = document.createElement('button');
-          btn.textContent = '삭제';
-          btn.className = 'delete-button';
-          btn.onclick = async () => {
-            for (const key in data) {
-              if (data[key].stockName === name) {
-                await remove(ref(privateRef, key));
-              }
+          const delBtn = document.createElement('button');
+          delBtn.textContent = '삭제';
+          delBtn.className = 'delete-button';
+          delBtn.onclick = async () => {
+            for (const k of keyMap[name]) {
+              await remove(ref(privateRef, k));
+              await remove(ref(publicRef, k));
             }
           };
-          li.appendChild(btn);
+          li.appendChild(delBtn);
         }
 
         list.appendChild(li);
