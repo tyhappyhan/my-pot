@@ -1,87 +1,55 @@
+<!-- 중복 제거와 공개 포트폴리오 보기까지 반영된 HTML -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>My Pot</title>
-  <meta name="description" content="My Pot는 내가 만든 첫 번째 웹사이트입니다." />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 2rem;
-    }
-    h1 {
-      font-size: 1.5rem;
-      color: black;
-      font-weight: bold;
-      margin-bottom: 10px;
-    }
-    form {
-      margin-top: 20px;
-      text-align: center;
-    }
-    input, button {
-      margin: 5px;
-      padding: 5px;
-    }
-    canvas {
-      max-width: 400px;
-      margin: auto;
-      display: block;
-    }
-    ul {
-      list-style: none;
-      padding: 0;
-      text-align: center;
-    }
-    li {
-      margin: 5px 0;
-    }
-    .delete-button {
-      margin-left: 10px;
-      background-color: crimson;
-      color: white;
-      border: none;
-      padding: 2px 6px;
-      cursor: pointer;
-    }
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    h1 { font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; }
+    form, .center { text-align: center; margin-top: 20px; }
+    input, button { margin: 5px; padding: 5px; }
+    canvas { max-width: 400px; margin: auto; display: block; }
+    ul { list-style: none; padding: 0; text-align: center; }
+    li { margin: 5px 0; }
+    .delete-button { margin-left: 10px; background-color: crimson; color: white; border: none; padding: 2px 6px; cursor: pointer; }
   </style>
 </head>
 <body>
-
   <h1>Stock Portfolio</h1>
 
-  <canvas id="portfolioChart" width="300" height="300"></canvas>
+  <canvas id="portfolioChart"></canvas>
   <ul id="portfolioList"></ul>
 
   <form id="portfolioForm">
-    <label for="stock-name">주식 이름:</label>
-    <input type="text" id="stock-name" required />
-    <label for="stock-percent">비율(%):</label>
-    <input type="number" id="stock-percent" required min="0" max="100" />
+    <label>주식 이름:</label><input type="text" id="stock-name" required />
+    <label>비율(%):</label><input type="number" id="stock-percent" required min="0" max="100" />
     <button type="submit">저장</button>
   </form>
 
-  <div style="text-align: center; margin-top: 10px;">
+  <div class="center">
     <button id="resetButton">초기화</button>
   </div>
 
-  <div id="authSection" style="text-align: center; margin-top: 20px;">
+  <div id="authSection" class="center">
     <button id="googleLoginBtn">Google로 로그인</button>
-    <span id="userInfo" style="display:none; margin-left: 10px;"></span>
+    <span id="userInfo" style="display:none;"></span>
     <button id="logoutBtn" style="display:none;">로그아웃</button>
+  </div>
+
+  <div class="center">
+    <input type="text" id="viewUserId" placeholder="사용자 ID (이메일 앞부분)" />
+    <button id="viewPublicBtn">다른 사람 포트폴리오 보기</button>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
     import { getDatabase, ref, push, onValue, get, remove, child } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
     import {
-      getAuth,
-      signInWithPopup,
-      GoogleAuthProvider,
-      signOut,
-      onAuthStateChanged
+      getAuth, signInWithPopup, GoogleAuthProvider,
+      signOut, onAuthStateChanged
     } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
 
     const firebaseConfig = {
@@ -101,119 +69,95 @@
     const provider = new GoogleAuthProvider();
 
     let userUID = null;
+    let publicId = null;
     let chartInstance;
-    let formSetupDone = false;
 
     document.getElementById('googleLoginBtn').onclick = () => {
-      signInWithPopup(auth, provider)
-        .then((result) => {
-          userUID = result.user.uid;
-        })
-        .catch((error) => {
-          alert("로그인 실패: " + error.message);
-        });
+      signInWithPopup(auth, provider).catch(err => alert("로그인 실패: " + err.message));
     };
 
-    document.getElementById('logoutBtn').onclick = () => {
-      signOut(auth);
-    };
+    document.getElementById('logoutBtn').onclick = () => signOut(auth);
 
     onAuthStateChanged(auth, (user) => {
-      const googleLoginBtn = document.getElementById('googleLoginBtn');
+      const loginBtn = document.getElementById('googleLoginBtn');
       const logoutBtn = document.getElementById('logoutBtn');
       const userInfo = document.getElementById('userInfo');
 
       if (user) {
         userUID = user.uid;
-        googleLoginBtn.style.display = 'none';
+        publicId = user.email.split('@')[0];
+        loginBtn.style.display = 'none';
         logoutBtn.style.display = 'inline';
         userInfo.style.display = 'inline';
         userInfo.textContent = user.email;
-        setupPortfolio(userUID);
+        setupPortfolio(userUID, publicId);
       } else {
         userUID = null;
-        googleLoginBtn.style.display = 'inline';
+        publicId = null;
+        loginBtn.style.display = 'inline';
         logoutBtn.style.display = 'none';
         userInfo.style.display = 'none';
         userInfo.textContent = '';
       }
     });
 
-    function setupPortfolio(uid) {
-      const portfolioRef = ref(db, `portfolio/${uid}`);
+    function setupPortfolio(uid, publicId) {
+      const privateRef = ref(db, `portfolio/${uid}`);
+      const publicRef = ref(db, `public/${publicId}`);
 
-      onValue(portfolioRef, (snapshot) => {
+      onValue(privateRef, (snapshot) => {
         const data = snapshot.val() || {};
         drawChart(data);
-        updateList(data, portfolioRef);
+        updateList(data, privateRef, true);
       });
 
-      if (!formSetupDone) {
-        const form = document.getElementById('portfolioForm');
-        const nameInput = document.getElementById('stock-name');
-        const percentInput = document.getElementById('stock-percent');
+      const form = document.getElementById('portfolioForm');
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('stock-name').value.trim();
+        const percent = parseFloat(document.getElementById('stock-percent').value);
+        if (!name || isNaN(percent) || percent <= 0 || percent > 100) {
+          return alert("올바른 값을 입력하세요.");
+        }
 
-        form.addEventListener('submit', async (e) => {
-          e.preventDefault();
-          const name = nameInput.value.trim();
-          const percent = parseFloat(percentInput.value);
+        const snap = await get(privateRef);
+        let total = 0;
+        if (snap.exists()) {
+          Object.values(snap.val()).forEach(v => total += Number(v.stockPercent));
+        }
 
-          if (!name || isNaN(percent) || percent <= 0 || percent > 100) {
-            alert("올바른 이름과 0~100 사이의 비율을 입력하세요.");
-            return;
-          }
+        if (total + percent > 100) {
+          return alert(`총 비율이 100%를 넘을 수 없습니다. 현재: ${total}%`);
+        }
 
-          const snapshot = await get(portfolioRef);
-          const data = snapshot.val();
-          let total = 0;
+        const newEntry = { stockName: name, stockPercent: percent };
+        await push(privateRef, newEntry);
+        await push(publicRef, newEntry);
 
-          if (data) {
-            for (const key in data) {
-              total += Number(data[key].stockPercent);
-            }
-          }
+        form.reset();
+      };
 
-          if (total + percent > 100) {
-            alert(`총 비율이 100%를 넘을 수 없습니다. 현재: ${total}%, 추가 시: ${total + percent}%`);
-            return;
-          }
-
-          await push(portfolioRef, {
-            stockName: name,
-            stockPercent: percent
-          });
-
-          nameInput.value = '';
-          percentInput.value = '';
-        });
-
-        document.getElementById('resetButton').addEventListener('click', async () => {
-          await remove(portfolioRef);
-        });
-
-        formSetupDone = true;
-      }
+      document.getElementById('resetButton').onclick = async () => {
+        await remove(privateRef);
+        await remove(publicRef);
+      };
     }
 
     function drawChart(rawData) {
-      const portfolioMap = {};
-
-      for (const key in rawData) {
-        const item = rawData[key];
-        const name = item.stockName;
-        const percent = Number(item.stockPercent);
-        portfolioMap[name] = (portfolioMap[name] || 0) + percent;
-      }
-
       const ctx = document.getElementById('portfolioChart').getContext('2d');
       if (chartInstance) chartInstance.destroy();
+
+      const portfolioMap = {};
+      for (const key in rawData) {
+        const item = rawData[key];
+        portfolioMap[item.stockName] = (portfolioMap[item.stockName] || 0) + Number(item.stockPercent);
+      }
 
       const labels = Object.keys(portfolioMap);
       const values = Object.values(portfolioMap);
       const backgroundColors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#00D084'];
 
       const total = values.reduce((a, b) => a + b, 0);
-
       if (total < 100) {
         labels.push('나머지');
         values.push(100 - total);
@@ -225,21 +169,16 @@
         data: {
           labels,
           datasets: [{
-            label: '포트폴리오',
             data: values,
             backgroundColor: backgroundColors.slice(0, values.length)
           }]
         },
         options: {
-          responsive: true,
           cutout: '80%',
           plugins: {
-            legend: { display: true },
             tooltip: {
               callbacks: {
-                label: function(context) {
-                  return `${context.label}: ${context.raw}%`;
-                }
+                label: ctx => `${ctx.label}: ${ctx.raw}%`
               }
             }
           }
@@ -247,22 +186,32 @@
       });
     }
 
-    function updateList(data, portfolioRef) {
+    function updateList(data, refPath, editable) {
       const list = document.getElementById('portfolioList');
       list.innerHTML = '';
       for (const key in data) {
         const li = document.createElement('li');
         li.textContent = `${data[key].stockName} - ${data[key].stockPercent}%`;
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = '삭제';
-        deleteBtn.className = 'delete-button';
-        deleteBtn.onclick = () => remove(child(portfolioRef, key));
-        li.appendChild(deleteBtn);
-
+        if (editable) {
+          const delBtn = document.createElement('button');
+          delBtn.textContent = '삭제';
+          delBtn.className = 'delete-button';
+          delBtn.onclick = () => remove(child(refPath, key));
+          li.appendChild(delBtn);
+        }
         list.appendChild(li);
       }
     }
+
+    document.getElementById('viewPublicBtn').onclick = async () => {
+      const userId = document.getElementById('viewUserId').value.trim();
+      if (!userId) return alert("사용자 ID를 입력하세요.");
+      const publicRef = ref(db, `public/${userId}`);
+      const snapshot = await get(publicRef);
+      if (!snapshot.exists()) return alert("해당 사용자의 포트폴리오가 없습니다.");
+      drawChart(snapshot.val());
+      updateList(snapshot.val(), publicRef, false); // 삭제 비활성화
+    };
   </script>
 </body>
 </html>
