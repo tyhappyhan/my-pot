@@ -1,4 +1,3 @@
-<!-- 중복 제거와 공개 포트폴리오 보기까지 반영된 HTML -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -42,6 +41,11 @@
   <div class="center">
     <input type="text" id="viewUserId" placeholder="사용자 ID (이메일 앞부분)" />
     <button id="viewPublicBtn">다른 사람 포트폴리오 보기</button>
+  </div>
+
+  <!-- '내 포트폴리오로 돌아가기' 버튼 추가 -->
+  <div class="center">
+    <button id="backToMyPortfolioBtn" style="display:none;">내 포트폴리오로 돌아가기</button>
   </div>
 
   <script type="module">
@@ -209,8 +213,25 @@
       const publicRef = ref(db, `public/${userId}`);
       const snapshot = await get(publicRef);
       if (!snapshot.exists()) return alert("해당 사용자의 포트폴리오가 없습니다.");
+      
+      // 다른 사람 포트폴리오 보여주기
       drawChart(snapshot.val());
       updateList(snapshot.val(), publicRef, false); // 삭제 비활성화
+
+      // '내 포트폴리오로 돌아가기' 버튼 보이기
+      document.getElementById('backToMyPortfolioBtn').style.display = 'inline';
+      
+      // '다른 사람 포트폴리오 보기' 버튼 숨기기
+      document.getElementById('viewPublicBtn').style.display = 'none';
+    };
+
+    document.getElementById('backToMyPortfolioBtn').onclick = () => {
+      // 내 포트폴리오로 돌아가기
+      setupPortfolio(userUID, publicId);
+
+      // 버튼 상태 변경
+      document.getElementById('backToMyPortfolioBtn').style.display = 'none';
+      document.getElementById('viewPublicBtn').style.display = 'inline';
     };
   </script>
 </body>
