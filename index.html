@@ -203,9 +203,9 @@
 
       const total = values.reduce((a, b) => a + b, 0);
       if (total < 100) {
-        labels.push('나머지');
+        labels.push('현금');  // '나머지' 대신 '현금'으로 변경
         values.push(100 - total);
-        backgroundColors.push('#e0e0e0');
+        backgroundColors.push('#e0e0e0');  // 회색 고정
       }
 
       chartInstance = new Chart(ctx, {
