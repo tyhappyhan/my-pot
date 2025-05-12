@@ -69,13 +69,7 @@
 
   <form id="portfolioForm">
     <label>주식 티커:</label>
-    <input
-      type="text"
-      id="stock-name"
-      required
-      pattern="^[A-Z]{1,6}$|^[가-힣]{2,10}$"
-      title="영문 티커(대문자 1~6자) 또는 한글 이름(2~10자)만 입력하세요."
-    />
+    <input type="text" id="stock-name" required />
     <label>비율(%):</label>
     <input type="number" id="stock-percent" step="0.01" required min="0" max="100" />
     <button type="submit">저장</button>
@@ -157,6 +151,25 @@
       }
     });
 
+    async function fetchStockNameFromTicker(ticker) {
+      try {
+        let query = ticker.toUpperCase();
+        if (/^\d{5,6}$/.test(query)) query += '.KS';
+
+        const res = await fetch(`https://query1.finance.yahoo.com/v1/finance/search?q=${query}`);
+        const data = await res.json();
+
+        if (data.quotes && data.quotes.length > 0 && data.quotes[0].shortname) {
+          return data.quotes[0].shortname;
+        } else {
+          return ticker;
+        }
+      } catch (err) {
+        console.error("티커 변환 실패:", err);
+        return ticker;
+      }
+    }
+
     function setupPortfolio(uid, publicIdLocal) {
       const privateRef = ref(db, `portfolio/${uid}`);
       const publicRef = ref(db, `public/${publicIdLocal}`);
@@ -170,11 +183,14 @@
       const form = document.getElementById('portfolioForm');
       form.onsubmit = async (e) => {
         e.preventDefault();
-        const name = document.getElementById('stock-name').value.trim();
+        const rawTicker = document.getElementById('stock-name').value.trim().toUpperCase();
         const percent = parseFloat(document.getElementById('stock-percent').value);
-        if (!name || isNaN(percent) || percent <= 0 || percent > 100) {
+
+        if (!rawTicker || isNaN(percent) || percent <= 0 || percent > 100) {
           return alert("올바른 값을 입력하세요.");
         }
+
+        const stockName = await fetchStockNameFromTicker(rawTicker);
 
         const snap = await get(privateRef);
         let total = 0;
@@ -186,7 +202,7 @@
           return alert(`총 비율이 100%를 넘을 수 없습니다. 현재: ${total.toFixed(2)}%`);
         }
 
-        const newEntry = { stockName: name, stockPercent: percent };
+        const newEntry = { stockName, stockPercent: percent };
         await push(privateRef, newEntry);
         await push(publicRef, newEntry);
         form.reset();
@@ -275,10 +291,7 @@
 
           delBtn.onclick = async () => {
             for (const key in data) {
-              if (
-                data[key].stockName === name &&
-                Number(data[key].stockPercent) === percent
-              ) {
+              if (data[key].stockName === name && Number(data[key].stockPercent) === percent) {
                 await remove(child(refPath, key));
                 break;
               }
@@ -288,10 +301,7 @@
             if (publicSnap.exists()) {
               for (const pubKey in publicSnap.val()) {
                 const entry = publicSnap.val()[pubKey];
-                if (
-                  entry.stockName === name &&
-                  Number(entry.stockPercent) === percent
-                ) {
+                if (entry.stockName === name && Number(entry.stockPercent) === percent) {
                   await remove(child(publicRef, pubKey));
                   break;
                 }
@@ -331,17 +341,6 @@
       document.getElementById('backToMyPortfolioBtn').style.display = 'none';
       document.getElementById('viewPublicBtn').style.display = 'inline';
     };
-
-    // 실시간 유효성 검사
-    document.getElementById('stock-name').addEventListener('input', (e) => {
-      const value = e.target.value;
-      const isValid = /^[A-Z]{1,6}$/.test(value) || /^[가-힣]{2,10}$/.test(value);
-      if (!isValid && value !== '') {
-        e.target.setCustomValidity("영문 티커(대문자 1~6자) 또는 한글 이름(2~10자)을 입력하세요.");
-      } else {
-        e.target.setCustomValidity("");
-      }
-    });
   </script>
 </body>
 </html>
