@@ -121,6 +121,11 @@
     let userUID = null;
     let publicId = null;
     let chartInstance;
+    let unsubscribe = null;
+
+    function sanitizeId(email) {
+      return email.split('@')[0].replace(/[^a-zA-Z0-9_-]/g, '_');
+    }
 
     document.getElementById('googleLoginBtn').onclick = () => {
       signInWithPopup(auth, provider).catch(err => alert("로그인 실패: " + err.message));
@@ -135,7 +140,7 @@
 
       if (user) {
         userUID = user.uid;
-        publicId = user.email.split('@')[0];
+        publicId = sanitizeId(user.email);
         loginBtn.style.display = 'none';
         logoutBtn.style.display = 'inline';
         userInfo.style.display = 'inline';
@@ -144,6 +149,7 @@
       } else {
         userUID = null;
         publicId = null;
+        if (unsubscribe) unsubscribe();
         loginBtn.style.display = 'inline';
         logoutBtn.style.display = 'none';
         userInfo.style.display = 'none';
@@ -154,25 +160,21 @@
     async function fetchStockNameFromTicker(ticker) {
       try {
         let query = ticker.toUpperCase();
-        // 한국 주식은 .KS 붙이기
         if (/^\d{5,6}$/.test(query)) query += '.KS';
-
-        console.log(`티커 요청: ${query}`); // 디버깅 로그 추가
 
         const res = await fetch(`https://query1.finance.yahoo.com/v1/finance/search?q=${query}`);
         const data = await res.json();
 
-        console.log("API 응답 데이터:", data); // API 응답 로그 추가
-
         if (data.quotes && data.quotes.length > 0 && data.quotes[0].shortname) {
           return data.quotes[0].shortname;
         } else {
-          console.warn(`주식명 변환 실패: ${ticker}`); // 주식명 변환 실패 로그
-          return ticker;  // 주식명 변환 실패 시 티커 그대로 반환
+          alert("주식명을 찾을 수 없습니다. 티커를 다시 확인해주세요.");
+          return ticker;
         }
       } catch (err) {
-        console.error("티커 변환 실패:", err); // 에러 로그 추가
-        return ticker;  // 에러 발생 시 티커 그대로 반환
+        console.error("티커 변환 실패:", err);
+        alert("주식명 검색 실패. 인터넷 연결을 확인하거나 직접 입력하세요.");
+        return ticker;
       }
     }
 
@@ -180,7 +182,8 @@
       const privateRef = ref(db, `portfolio/${uid}`);
       const publicRef = ref(db, `public/${publicIdLocal}`);
 
-      onValue(privateRef, (snapshot) => {
+      if (unsubscribe) unsubscribe();
+      unsubscribe = onValue(privateRef, (snapshot) => {
         const data = snapshot.val() || {};
         drawChart(data);
         updateList(data, privateRef, publicRef, true);
@@ -195,7 +198,7 @@
           return alert("올바른 값을 입력하세요.");
         }
 
-        const stockName = await fetchStockNameFromTicker(name); // 티커를 주식명으로 변환
+        const stockName = await fetchStockNameFromTicker(name);
 
         const snap = await get(privateRef);
         let total = 0;
@@ -214,13 +217,18 @@
       };
 
       document.getElementById('resetButton').onclick = async () => {
-        await remove(privateRef);
-        await remove(publicRef);
+        if (confirm("정말로 모든 포트폴리오 항목을 삭제하시겠습니까?")) {
+          await remove(privateRef);
+          await remove(publicRef);
+        }
       };
     }
 
     function drawChart(rawData) {
-      const ctx = document.getElementById('portfolioChart').getContext('2d');
+      const canvas = document.getElementById('portfolioChart');
+      const ctx = canvas.getContext('2d');
+      canvas.width = canvas.width;
+
       if (chartInstance) chartInstance.destroy();
 
       const portfolioMap = {};
@@ -276,7 +284,6 @@
 
       for (const key in data) {
         const item = data[key];
-        // 데이터가 존재하는지 확인
         if (item) {
           const name = item.stockName;
           const percent = Number(item.stockPercent);
@@ -337,7 +344,9 @@
     document.getElementById('viewPublicBtn').onclick = async () => {
       const userId = document.getElementById('viewUserId').value.trim();
       if (!userId) return alert("사용자 ID를 입력하세요.");
-      const publicRef = ref(db, `public/${userId}`);
+
+      const safeId = userId.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const publicRef = ref(db, `public/${safeId}`);
       const snapshot = await get(publicRef);
       if (!snapshot.exists()) return alert("해당 사용자의 포트폴리오가 없습니다.");
 
