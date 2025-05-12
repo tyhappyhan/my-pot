@@ -69,7 +69,13 @@
 
   <form id="portfolioForm">
     <label>주식 티커:</label>
-    <input type="text" id="stock-name" required />
+    <input
+      type="text"
+      id="stock-name"
+      required
+      pattern="^[A-Z]{1,6}$|^[가-힣]{2,10}$"
+      title="영문 티커(대문자 1~6자) 또는 한글 이름(2~10자)만 입력하세요."
+    />
     <label>비율(%):</label>
     <input type="number" id="stock-percent" step="0.01" required min="0" max="100" />
     <button type="submit">저장</button>
@@ -249,7 +255,6 @@
 
       for (const key in data) {
         const item = data[key];
-        // 데이터가 존재하는지 확인
         if (item) {
           const name = item.stockName;
           const percent = Number(item.stockPercent);
@@ -326,6 +331,17 @@
       document.getElementById('backToMyPortfolioBtn').style.display = 'none';
       document.getElementById('viewPublicBtn').style.display = 'inline';
     };
+
+    // 실시간 유효성 검사
+    document.getElementById('stock-name').addEventListener('input', (e) => {
+      const value = e.target.value;
+      const isValid = /^[A-Z]{1,6}$/.test(value) || /^[가-힣]{2,10}$/.test(value);
+      if (!isValid && value !== '') {
+        e.target.setCustomValidity("영문 티커(대문자 1~6자) 또는 한글 이름(2~10자)을 입력하세요.");
+      } else {
+        e.target.setCustomValidity("");
+      }
+    });
   </script>
 </body>
 </html>
