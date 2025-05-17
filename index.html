@@ -5,24 +5,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>My Pot</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
   <style>
     body { font-family: Arial, sans-serif; margin: 2rem; background: #f9f9f9; }
-    h1 { font-size: 1.5rem; font-weight: bold; margin-bottom: 10px; text-align: center; }
+    h1, h2 { text-align: center; }
     form, .center { text-align: center; margin-top: 20px; }
     canvas { max-width: 400px; margin: auto; display: block; }
     ul { list-style: none; padding: 0; text-align: center; }
     li { margin: 5px 0; }
-    input[type="text"], input[type="number"], select {
+    input, select {
       padding: 8px 12px;
       border-radius: 4px;
       border: 1px solid #ccc;
       font-size: 0.95rem;
       margin: 5px;
-      transition: border 0.2s ease;
-    }
-    input:focus, select:focus {
-      border-color: #4facfe;
-      outline: none;
     }
     button {
       padding: 8px 14px;
@@ -30,34 +29,18 @@
       border: 1px solid #ccc;
       border-radius: 4px;
       background-color: #fff;
-      color: #222;
       font-size: 0.9rem;
       cursor: pointer;
-      transition: background-color 0.2s ease, border-color 0.2s ease;
     }
-    button:hover {
-      background-color: #f5f5f5;
-      border-color: #999;
-    }
-    button:active {
-      background-color: #ebebeb;
-      border-color: #888;
-    }
+    button:hover { background-color: #f5f5f5; }
     .delete-button {
-      background-color: #e74c3c;
-      color: #fff;
-      border: none;
+      background-color: #e74c3c; color: #fff; border: none;
     }
-    .delete-button:hover {
-      background-color: #c0392b;
-    }
-    .delete-button:active {
-      background-color: #a93226;
-    }
+    .delete-button:hover { background-color: #c0392b; }
   </style>
 </head>
 <body>
-  <h1>Stock Portfolio</h1>
+  <h1>📊 Stock Portfolio</h1>
   <canvas id="portfolioChart"></canvas>
 
   <div id="assetSummary" class="center">
@@ -77,16 +60,47 @@
 
   <ul id="portfolioList"></ul>
 
-  <script>
-    let cash = 5000000;
-    let portfolio = {}; // { ticker: 수량 }
+  <!-- 로그인/로그아웃 및 유저 정보 -->
+  <div class="center" id="authSection">
+    <button id="loginBtn">Google 로그인</button>
+    <button id="logoutBtn" style="display:none">로그아웃</button>
+    <p id="userInfo"></p>
+  </div>
 
+  <h2 class="center">💹 리더보드</h2>
+  <ul id="leaderboard" class="center"></ul>
+
+  <script>
+    // Firebase 설정
+    const firebaseConfig = {
+      apiKey: "AIzaSyAdVxtJBPhfjJFCExi1epjQQGpt3FPMTrQ",
+      authDomain: "stock-pot-62bae.firebaseapp.com",
+      databaseURL: "https://stock-pot-62bae-default-rtdb.firebaseio.com",
+      projectId: "stock-pot-62bae",
+      storageBucket: "stock-pot-62bae.firebasestorage.app",
+      messagingSenderId: "891999801181",
+      appId: "1:891999801181:web:06f0df3269271fb146e2b4",
+      measurementId: "G-7TQMFR10PQ"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // 변수
+    let cash = 5000000;
+    let portfolio = {};
     const chartCanvas = document.getElementById("portfolioChart");
     const cashDisplay = document.getElementById("cashAmount");
     const list = document.getElementById("portfolioList");
     const sellAllBtn = document.getElementById("sellAllBtn");
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const userInfo = document.getElementById("userInfo");
+    const leaderboardEl = document.getElementById("leaderboard");
     let chartInstance;
+    let currentUser = null;
 
+    // 차트 그리기
     function drawChart() {
       const labels = [];
       const values = [];
@@ -94,7 +108,7 @@
 
       for (let ticker in portfolio) {
         labels.push(ticker);
-        values.push(portfolio[ticker] * 10000); // 고정 가격
+        values.push(portfolio[ticker] * 10000);
       }
 
       labels.push("현금");
@@ -133,7 +147,14 @@
       cashDisplay.textContent = cash.toLocaleString();
     }
 
-    document.getElementById("tradeForm").onsubmit = (e) => {
+    // 거래 후 업데이트 + Firestore에 반영
+    async function afterTradeUpdate() {
+      updateList();
+      drawChart();
+      await updateUserData();
+    }
+
+    document.getElementById("tradeForm").onsubmit = async (e) => {
       e.preventDefault();
       const ticker = document.getElementById("tradeTicker").value.toUpperCase();
       const qty = parseInt(document.getElementById("tradeQty").value);
@@ -154,24 +175,74 @@
         if (portfolio[ticker] === 0) delete portfolio[ticker];
       }
 
-      updateList();
-      drawChart();
       e.target.reset();
+      await afterTradeUpdate();
     };
 
-    sellAllBtn.onclick = () => {
+    sellAllBtn.onclick = async () => {
       let totalGain = 0;
       for (let ticker in portfolio) {
         totalGain += portfolio[ticker] * 10000;
       }
       portfolio = {};
       cash += totalGain;
-      updateList();
-      drawChart();
       alert("모든 종목을 매도했습니다.");
+      await afterTradeUpdate();
     };
 
-    // 초기화
+    // 로그인/로그아웃 처리
+    loginBtn.onclick = async () => {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      try {
+        await auth.signInWithPopup(provider);
+      } catch (err) {
+        alert("로그인 실패: " + err.message);
+      }
+    };
+
+    logoutBtn.onclick = () => {
+      auth.signOut();
+    };
+
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        currentUser = user;
+        userInfo.textContent = `${user.displayName}님 환영합니다!`;
+        loginBtn.style.display = "none";
+        logoutBtn.style.display = "inline-block";
+        fetchLeaderboard();
+      } else {
+        currentUser = null;
+        userInfo.textContent = "";
+        loginBtn.style.display = "inline-block";
+        logoutBtn.style.display = "none";
+        leaderboardEl.innerHTML = "";
+      }
+    });
+
+    async function updateUserData() {
+      if (!currentUser) return;
+      const totalAsset = cash + Object.values(portfolio).reduce((sum, qty) => sum + qty * 10000, 0);
+      await db.collection("users").doc(currentUser.uid).set({
+        name: currentUser.displayName,
+        asset: totalAsset,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      fetchLeaderboard();
+    }
+
+    async function fetchLeaderboard() {
+      const snapshot = await db.collection("users").orderBy("asset", "desc").limit(10).get();
+      leaderboardEl.innerHTML = "";
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        const li = document.createElement("li");
+        li.textContent = `${data.name}: ${data.asset.toLocaleString()}원`;
+        leaderboardEl.appendChild(li);
+      });
+    }
+
+    // 초기 렌더링
     updateList();
     drawChart();
   </script>
