@@ -72,6 +72,7 @@
       <option value="sell">매도</option>
     </select>
     <button type="submit">거래</button>
+    <button type="button" id="sellAllBtn">전체 매도</button>
   </form>
 
   <ul id="portfolioList"></ul>
@@ -83,6 +84,7 @@
     const chartCanvas = document.getElementById("portfolioChart");
     const cashDisplay = document.getElementById("cashAmount");
     const list = document.getElementById("portfolioList");
+    const sellAllBtn = document.getElementById("sellAllBtn");
     let chartInstance;
 
     function drawChart() {
@@ -90,14 +92,9 @@
       const values = [];
       const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'];
 
-      let totalValue = 0;
-      for (let ticker in portfolio) {
-        totalValue += portfolio[ticker] * 10000; // 1주당 10,000원 가정
-      }
-
       for (let ticker in portfolio) {
         labels.push(ticker);
-        values.push(portfolio[ticker] * 10000);
+        values.push(portfolio[ticker] * 10000); // 고정 가격
       }
 
       labels.push("현금");
@@ -141,7 +138,7 @@
       const ticker = document.getElementById("tradeTicker").value.toUpperCase();
       const qty = parseInt(document.getElementById("tradeQty").value);
       const type = document.getElementById("tradeType").value;
-      const price = 10000; // 1주당 고정 가격
+      const price = 10000;
 
       if (!ticker || qty <= 0) return;
 
@@ -160,6 +157,18 @@
       updateList();
       drawChart();
       e.target.reset();
+    };
+
+    sellAllBtn.onclick = () => {
+      let totalGain = 0;
+      for (let ticker in portfolio) {
+        totalGain += portfolio[ticker] * 10000;
+      }
+      portfolio = {};
+      cash += totalGain;
+      updateList();
+      drawChart();
+      alert("모든 종목을 매도했습니다.");
     };
 
     // 초기화
